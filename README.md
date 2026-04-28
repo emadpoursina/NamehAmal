@@ -91,6 +91,8 @@ curl -sS -X POST "http://localhost:3000/api/categories" \
 - **List**: `GET /api/sessions`
   - Optional filters: `categoryId`, `occurredFrom`, `occurredTo`, `limit`
 - **Create**: `POST /api/sessions`
+- **Update**: `PATCH /api/sessions/:id`
+- **Delete**: `DELETE /api/sessions/:id`
 
 Example:
 
@@ -106,6 +108,12 @@ curl -sS -X POST "http://localhost:3000/api/sessions" \
     "occurredAt":"2026-01-01T12:00:00.000Z",
     "durationSeconds":1500
   }' | jq
+
+curl -sS -X PATCH "http://localhost:3000/api/sessions/<session-id>" \
+  -H "content-type: application/json" \
+  -d '{"title":"Updated title","durationSeconds":1800}' | jq
+
+curl -sS -X DELETE "http://localhost:3000/api/sessions/<session-id>" | jq
 ```
 
 ## Common tasks

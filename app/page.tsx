@@ -113,7 +113,7 @@ export default async function DashboardPage({
       </div>
 
       {/* Sessions data table */}
-      <SessionsTable sessions={sessions} />
+      <SessionsTable sessions={sessions} categories={categories} />
     </div>
   );
 }
