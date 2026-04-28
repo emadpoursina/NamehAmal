@@ -96,6 +96,11 @@ Rules:
    - remove existing categories
 2. Categories are predefined but editable
 
+Notes:
+- Removing a category is implemented as **archiving** (`isArchived=true`) to preserve history.
+- Archived categories are hidden from session creation pickers by default, but existing sessions still show their category.
+- Category ordering in UI lists is controlled by `sortOrder` (adjustable in Settings).
+
 ---
 
 ## 3. Page List
@@ -145,6 +150,10 @@ Main working page:
   - remove
 - Export data (JSON / CSV)
 - Import data
+
+Implementation notes:
+- “Remove” = archive/restore (no hard delete).
+- Reordering uses simple Up/Down controls and persists via `sortOrder`.
 
 ---
 
