@@ -140,7 +140,14 @@ Main working page:
 - Filter by:
   - date range
   - category
-- Simple charts or summarized view
+- MVP: **summarized view only** (list of totals by category). Charts can be added later.
+
+Implementation notes:
+- Stats uses session `occurredAt` for date-range filtering and `durationSeconds` for totals.
+- Proposed query params:
+  - `from`: `YYYY-MM-DD` (local date)
+  - `to`: `YYYY-MM-DD` (local date)
+  - `categoryId`: optional category filter
 
 ---
 
