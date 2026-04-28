@@ -71,7 +71,7 @@ export default async function StatsPage({
   const categoryId = typeof sp.categoryId === "string" ? sp.categoryId : "";
 
   const todayYmd = formatYmdLocal(new Date());
-  let fromYmd = ymdToLocalRange(fromRaw) ? fromRaw : todayYmd;
+  const fromYmd = ymdToLocalRange(fromRaw) ? fromRaw : todayYmd;
   let toYmd = ymdToLocalRange(toRaw) ? toRaw : fromYmd;
   if (toYmd.localeCompare(fromYmd) < 0) toYmd = fromYmd;
 
