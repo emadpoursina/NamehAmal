@@ -46,10 +46,10 @@ async function fetchJson<T>(url: string): Promise<T> {
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams?: Record<string, string | string[] | undefined>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   // Parse searchParams for date and categoryId
-  const sp = searchParams ?? {};
+  const sp = (await searchParams) ?? {};
   const dateRaw = typeof sp.date === "string" ? sp.date : "";
   const categoryId = typeof sp.categoryId === "string" ? sp.categoryId : "";
 
