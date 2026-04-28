@@ -11,3 +11,57 @@ generator client {
 datasource db {
   provider = "sqlite"
 }
+
+enum SessionKind {
+  MANUAL
+  TIMER
+}
+
+model Category {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  color     String?
+  sortOrder Int       @default(0)
+  isArchived Boolean  @default(false)
+
+  sessions  Session[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([isArchived, sortOrder])
+}
+
+model Session {
+  id        String      @id @default(cuid())
+  kind      SessionKind
+
+  /// User-facing title for the time session.
+  title     String?
+
+  /// Optional notes about what happened in this session.
+  note      String?
+
+  categoryId String
+  category   Category   @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  /// Canonical timestamp used for “by date” filtering (manual date or timer start).
+  occurredAt DateTime
+
+  /// Start timestamp for live tracking (null for purely manual sessions).
+  startedAt  DateTime?
+
+  /// End timestamp for live tracking (null while running).
+  endedAt    DateTime?
+
+  /// Total session duration in seconds (manual duration or computed on stop).
+  durationSeconds Int
+
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@index([occurredAt])
+  @@index([categoryId, occurredAt])
+  @@index([startedAt])
+  @@index([endedAt])
+}
