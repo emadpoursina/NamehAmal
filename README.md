@@ -4,8 +4,7 @@ Minimal, local-first time tracking app built with **Next.js (App Router)**, **Ty
 
 ## Prerequisites
 
-- Node.js **LTS**
-- A single package manager (recommend **pnpm**)
+- Bun (recommended) or Node.js (LTS)
 
 ## Environment variables
 
@@ -27,34 +26,59 @@ Example:
 DATABASE_URL="file:./dev.db"
 ```
 
-## Setup
+## Setup (recommended: Bun)
 
 Install dependencies:
 
 ```bash
-pnpm install
+bun install
 ```
 
-Add Prisma + SQLite (first time only):
+Generate Prisma Client:
 
 ```bash
-pnpm add @prisma/client
-pnpm add -D prisma
-npx prisma init --datasource-provider sqlite
+bunx prisma generate
 ```
 
-Generate Prisma client (and run migrations once you have a schema):
+Run migrations (creates/updates `dev.db`):
 
 ```bash
-npx prisma generate
-npx prisma migrate dev
+bunx prisma migrate dev
 ```
 
 ## Run the app
 
 ```bash
-pnpm dev
+bun run dev
 ```
 
 Open `http://localhost:3000`.
+
+## Common tasks
+
+### Prisma Studio
+
+```bash
+bunx prisma studio
+```
+
+### Reset local database
+
+This project is local-first; your SQLite DB file is ignored by git (`*.db`).
+
+```bash
+rm -f dev.db
+bunx prisma migrate dev
+```
+
+### Lint
+
+```bash
+bun run lint
+```
+
+## Notes
+
+- Prisma Client is generated into `app/generated/prisma` (see `prisma/schema.prisma`).
+- The DB is SQLite and fully local (no auth, no cloud sync by design).
 
