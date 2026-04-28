@@ -51,6 +51,12 @@ export default function RootLayout({
               >
                 Settings
               </Link>
+              <Link
+                href="/stats"
+                className="rounded-md px-2.5 py-1 text-sm text-zinc-700 hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-950"
+              >
+                Stats
+              </Link>
             </nav>
           </div>
         </header>
