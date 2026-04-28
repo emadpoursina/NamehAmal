@@ -34,9 +34,14 @@ async function main() {
       ],
     });
 
-    const [work, _study, life] = await prisma.category.findMany({
+    const createdCategories = await prisma.category.findMany({
       orderBy: { sortOrder: "asc" },
     });
+    const work = createdCategories.find((c) => c.name === "Work");
+    const life = createdCategories.find((c) => c.name === "Life");
+    if (!work || !life) {
+      throw new Error("Seed categories not found after insertion.");
+    }
 
     const now = new Date();
     const ninetyMinutesAgo = new Date(now.getTime() - 90 * 60 * 1000);
@@ -75,11 +80,9 @@ async function main() {
 
 main()
   .then((result) => {
-    // eslint-disable-next-line no-console
     console.log("Seed completed.", result);
   })
   .catch((err) => {
-    // eslint-disable-next-line no-console
     console.error("Seed failed.", err);
     process.exitCode = 1;
   });
