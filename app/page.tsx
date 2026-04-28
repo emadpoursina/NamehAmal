@@ -1,65 +1,119 @@
-import Image from "next/image";
+import { headers } from "next/headers";
+import type { CategoryModel, SessionModel } from "@/app/generated/prisma/models";
+import { AddSessionForm } from "@/app/dashboard/AddSessionForm";
+import { DashboardFilters } from "@/app/dashboard/DashboardFilters";
+import { SessionsTable } from "@/app/dashboard/SessionsTable";
 
-export default function Home() {
+type SessionWithCategory = SessionModel & { category: CategoryModel };
+
+// Format a Date as YYYY-MM-DD in local time.
+function formatYmdLocal(date: Date) {
+  const y = date.getFullYear();
+  const m = `${date.getMonth() + 1}`.padStart(2, "0");
+  const d = `${date.getDate()}`.padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+// Convert YYYY-MM-DD to a local-day [from,to] range.
+function ymdToLocalRange(ymd: string) {
+  const [yRaw, mRaw, dRaw] = ymd.split("-");
+  const y = Number.parseInt(yRaw ?? "", 10);
+  const m = Number.parseInt(mRaw ?? "", 10);
+  const d = Number.parseInt(dRaw ?? "", 10);
+  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return null;
+
+  const from = new Date(y, m - 1, d, 0, 0, 0, 0);
+  const to = new Date(y, m - 1, d, 23, 59, 59, 999);
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return null;
+  return { from, to };
+}
+
+// Build an absolute URL for internal API fetches.
+async function getBaseUrl() {
+  const h = await headers();
+  const proto = h.get("x-forwarded-proto") ?? "http";
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
+  return `${proto}://${host}`;
+}
+
+// Fetch JSON and throw on non-2xx responses.
+async function fetchJson<T>(url: string): Promise<T> {
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Request failed: ${res.status} ${res.statusText}`);
+  return (await res.json()) as T;
+}
+
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams?: Record<string, string | string[] | undefined>;
+}) {
+  // Parse searchParams for date and categoryId
+  const sp = searchParams ?? {};
+  const dateRaw = typeof sp.date === "string" ? sp.date : "";
+  const categoryId = typeof sp.categoryId === "string" ? sp.categoryId : "";
+
+  // Compute the active date, defaulting to today if not specified or invalid
+  const todayYmd = formatYmdLocal(new Date());
+  const activeDate = ymdToLocalRange(dateRaw) ? dateRaw : todayYmd;
+  const range = ymdToLocalRange(activeDate);
+
+  // Build the base URL for API requests
+  const baseUrl = await getBaseUrl();
+
+  // Fetch all categories
+  const categoriesRes = await fetchJson<{ ok: boolean; data: CategoryModel[] }>(
+    `${baseUrl}/api/categories`,
+  );
+
+  // Prepare sessions API URL with filters
+  const sessionsUrl = new URL(`${baseUrl}/api/sessions`);
+  sessionsUrl.searchParams.set("limit", "200");
+  if (categoryId) sessionsUrl.searchParams.set("categoryId", categoryId);
+  if (range) {
+    sessionsUrl.searchParams.set("occurredFrom", range.from.toISOString());
+    sessionsUrl.searchParams.set("occurredTo", range.to.toISOString());
+  }
+
+  // Fetch sessions (with joined categories)
+  const sessionsRes = await fetchJson<{ ok: boolean; data: SessionWithCategory[] }>(
+    sessionsUrl.toString(),
+  );
+
+  const categories = categoriesRes.data ?? [];
+  const sessions = sessionsRes.data ?? [];
+
+  // Render the dashboard page
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 py-10 sm:px-6">
+      {/* Page header */}
+      <div className="flex flex-col gap-2">
+        <h1 className="text-2xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
+          Dashboard
+        </h1>
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          Track sessions and review your day.
+        </p>
+      </div>
+
+      {/* Filters and quick actions */}
+      <div className="flex flex-col gap-4 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-black">
+        <DashboardFilters
+          categories={categories}
+          activeDate={activeDate}
+          activeCategoryId={categoryId || null}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <AddSessionForm categories={categories} activeDate={activeDate} />
+          <div className="text-xs text-zinc-500 dark:text-zinc-400">
+            {/* Inform user about the number of sessions */}
+            Showing {sessions.length} session(s)
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      </div>
+
+      {/* Sessions data table */}
+      <SessionsTable sessions={sessions} />
     </div>
   );
 }
