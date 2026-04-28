@@ -161,6 +161,12 @@ Implementation notes:
 Implementation notes:
 - “Remove” = archive/restore (no hard delete).
 - Reordering uses simple Up/Down controls and persists via `sortOrder`.
+- Data import/export (v1):
+  - Export format is **versioned JSON** (CSV can be added later).
+  - Import mode is **merge**:
+    - Categories merge by unique `Category.name` (import creates missing categories, does not overwrite existing by default).
+    - Sessions reference categories by `categoryName` in the import file.
+  - Known limitation (v1): re-importing the same file may create **duplicate sessions** (no de-duplication yet).
 
 ---
 
