@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import type { CategoryModel } from "@/app/generated/prisma/models";
 import { CategoryManager } from "./CategoryManager";
+import { DataManager } from "./DataManager";
 
 // Build an absolute URL for internal API fetches.
 async function getBaseUrl() {
@@ -40,6 +41,7 @@ export default async function SettingsPage() {
       </div>
 
       <CategoryManager active={active} archived={archived} />
+      <DataManager />
     </div>
   );
 }
