@@ -67,10 +67,12 @@ export function TrackerCard({ categories }: { categories: CategoryModel[] }) {
 
   useEffect(() => {
     let cancelled = false;
-    setError(null);
     fetchActiveTimer()
       .then((s) => {
-        if (!cancelled) setActive(s);
+        if (!cancelled) {
+          setError(null);
+          setActive(s);
+        }
       })
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load timer.");
@@ -89,12 +91,12 @@ export function TrackerCard({ categories }: { categories: CategoryModel[] }) {
     };
   }, [active?.startedAt]);
 
-  const elapsedSeconds = useMemo(() => {
+  const elapsedSeconds = (() => {
     if (!active?.startedAt) return 0;
     const start = new Date(active.startedAt).getTime();
     if (Number.isNaN(start)) return 0;
     return Math.max(0, Math.floor((now - start) / 1000));
-  }, [active?.startedAt, now]);
+  })();
 
   async function onStart() {
     setError(null);
