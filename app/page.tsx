@@ -3,6 +3,7 @@ import type { CategoryModel, SessionModel } from "@/app/generated/prisma/models"
 import { AddSessionForm } from "@/app/dashboard/AddSessionForm";
 import { DashboardFilters } from "@/app/dashboard/DashboardFilters";
 import { SessionsTable } from "@/app/dashboard/SessionsTable";
+import { TrackerCard } from "@/app/dashboard/TrackerCard";
 
 type SessionWithCategory = SessionModel & { category: CategoryModel };
 
@@ -103,9 +104,10 @@ export default async function DashboardPage({
           activeDate={activeDate}
           activeCategoryId={categoryId || null}
         />
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-6">
           <AddSessionForm categories={categories} activeDate={activeDate} />
-          <div className="text-xs text-zinc-500 dark:text-zinc-400">
+          <TrackerCard categories={categories} />
+          <div className="text-xs text-zinc-500 dark:text-zinc-400 sm:ml-auto">
             {/* Inform user about the number of sessions */}
             Showing {sessions.length} session(s)
           </div>
