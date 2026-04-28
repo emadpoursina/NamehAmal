@@ -63,6 +63,11 @@ Existing tools are often:
 4. User clicks "Stop"
 5. Session is saved automatically
 
+Rules:
+- Only **one** live timer session can run at a time.
+- A live timer session is considered **running** when `kind = TIMER` and `endedAt = null`.
+- On stop, `durationSeconds` is computed as `max(1, floor((endedAt - startedAt) / 1000))`.
+
 ---
 
 ### Viewing & Filtering
