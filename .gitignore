@@ -48,3 +48,16 @@ bun.lockb
 # cursor
 .cursor
 cursor
+
+# prisma
+/app/generated/prisma
+
+# sqlite
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+*.db-trace
+*.db-trace-journal
+*.db-trace-wal
+*.db-trace-journal
