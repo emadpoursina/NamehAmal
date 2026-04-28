@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { CategoryModel, SessionModel } from "@/app/generated/prisma/models";
-import { formatDuration, formatTimeLocal } from "@/app/dashboard/format";
+import { formatDateLocalYmd, formatDuration, formatTimeLocal } from "@/app/dashboard/format";
 import { EditSessionDialog } from "@/app/dashboard/EditSessionDialog";
 
 type SessionWithCategory = SessionModel & { category: CategoryModel };
@@ -51,6 +51,7 @@ export function SessionsTable({
       <table className="w-full border-collapse text-sm">
         <thead className="bg-zinc-50 text-left text-xs font-medium text-zinc-600 dark:bg-zinc-950 dark:text-zinc-400">
           <tr>
+            <th className="px-4 py-3">Date</th>
             <th className="px-4 py-3">Time</th>
             <th className="px-4 py-3">Title</th>
             <th className="px-4 py-3">Category</th>
@@ -64,6 +65,9 @@ export function SessionsTable({
               key={s.id}
               className="border-t border-zinc-100 text-zinc-900 hover:bg-zinc-50/50 dark:border-zinc-900 dark:text-zinc-50 dark:hover:bg-zinc-950/50"
             >
+              <td className="px-4 py-3 font-mono text-xs text-zinc-700 dark:text-zinc-300">
+                {formatDateLocalYmd(s.occurredAt)}
+              </td>
               <td className="px-4 py-3 font-mono text-xs text-zinc-700 dark:text-zinc-300">
                 {formatTimeLocal(s.occurredAt)}
               </td>
