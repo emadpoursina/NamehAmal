@@ -19,6 +19,7 @@ function useDashboardFilterNavigation() {
       }
       const qs = next.toString();
       router.push(qs ? `${pathname}?${qs}` : pathname);
+      router.refresh();
     };
   }, [pathname, router, searchParams]);
 }
