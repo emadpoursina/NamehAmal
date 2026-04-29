@@ -58,6 +58,10 @@ Open `http://localhost:3000`.
 
 This project exposes minimal server endpoints (create + list) for **categories** and **sessions**.
 
+## Stats filters
+
+The Stats page at `/stats` uses `from`, `to` (local `YYYY-MM-DD`), and optional `categoryId`. If `from` / `to` are missing or invalid, the range defaults to the **current week** (local Monday through Sunday). A week dropdown sets `from` and `to` accordingly.
+
 ## Dashboard filters
 
 The Dashboard lives at `/` and stores filters in the URL so they are shareable and refresh-safe:
@@ -74,7 +78,8 @@ These filters are translated into `/api/sessions` query params:
 
 - **List**: `GET /api/categories` (default: non-archived)
   - `includeArchived=1` to include archived
-- **Create**: `POST /api/categories`
+- **Create**: `POST /api/categories` (optional `weeklyTargetHours`: number ≥ 0 or `null`)
+- **Update**: `PATCH /api/categories/:id` (optional `weeklyTargetHours` to set or clear weekly hour targets)
 
 Example:
 

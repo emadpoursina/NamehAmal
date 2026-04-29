@@ -138,12 +138,15 @@ Main working page:
 ### 4. Analytics (`/stats`)
 - Time spent per category
 - Filter by:
-  - date range
+  - **week preset** (Monday–Sunday, local time) or arbitrary date range
+  - date range (`from` / `to`)
   - category
+- **Weekly goals**: when the range is exactly one local Monday-through-Sunday week, compare tracked time per category to **weekly hour targets** set in Settings (categories with no target are omitted from the goals table).
 - MVP: **summarized view only** (list of totals by category). Charts can be added later.
 
 Implementation notes:
 - Stats uses session `occurredAt` for date-range filtering and `durationSeconds` for totals.
+- Default stats range when `from` / `to` are missing or invalid: **current calendar week** (local Monday 00:00 through Sunday end of day), matching the week preset control.
 - Proposed query params:
   - `from`: `YYYY-MM-DD` (local date)
   - `to`: `YYYY-MM-DD` (local date)
@@ -155,6 +158,7 @@ Implementation notes:
 - Manage categories:
   - add
   - remove
+- **Weekly targets**: planned hours per week (Monday–Sunday, local time) per **active** category; stored as `weeklyTargetHours` on `Category` (`null` = no target).
 - Export data (JSON / CSV)
 - Import data
 
@@ -163,8 +167,10 @@ Implementation notes:
 - Reordering uses simple Up/Down controls and persists via `sortOrder`.
 - Data import/export (v1):
   - Export format is **versioned JSON** (CSV can be added later).
+  - Category objects may include optional `weeklyTargetHours` (number or `null`).
   - Import mode is **merge**:
-    - Categories merge by unique `Category.name` (import creates missing categories, does not overwrite existing by default).
+    - Categories merge by unique `Category.name` (import creates missing categories).
+    - For categories that **already exist**, import updates `weeklyTargetHours` when that field is present on the category entry in the file (so targets round-trip with export).
     - Sessions reference categories by `categoryName` in the import file.
   - Known limitation (v1): re-importing the same file may create **duplicate sessions** (no de-duplication yet).
 
