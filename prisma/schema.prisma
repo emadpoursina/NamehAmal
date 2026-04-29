@@ -24,6 +24,9 @@ model Category {
   sortOrder Int       @default(0)
   isArchived Boolean  @default(false)
 
+  /// Planned hours per Monday–Sunday week (null = no weekly target).
+  weeklyTargetHours Float?
+
   sessions  Session[]
 
   createdAt DateTime  @default(now())
