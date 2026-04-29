@@ -3,6 +3,10 @@
 import { useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { CategoryModel } from "@/app/generated/prisma/models";
+import {
+  buildWeekPresetOptions,
+  matchingWeekPresetValue,
+} from "@/app/lib/local-week";
 
 // Compare YYYY-MM-DD strings (lexicographic order matches chronological order).
 function compareYmd(a: string, b: string) {
@@ -29,7 +33,7 @@ function useStatsFilterNavigation() {
   }, [pathname, router, searchParams]);
 }
 
-// Render the date range + category filters row.
+// Render week preset, date range, and category filters.
 export function StatsFilters({
   categories,
   activeFrom,
@@ -42,9 +46,43 @@ export function StatsFilters({
   activeCategoryId: string | null;
 }) {
   const navigate = useStatsFilterNavigation();
+  const weekPresets = useMemo(() => buildWeekPresetOptions(12), []);
+  const weekSelectValue = useMemo(
+    () => matchingWeekPresetValue(activeFrom, activeTo, weekPresets),
+    [activeFrom, activeTo, weekPresets],
+  );
+  const categoriesForPicker = useMemo(
+    () => categories.filter((c) => !c.isArchived),
+    [categories],
+  );
 
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1.5">
+        <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+          Week
+        </label>
+        <select
+          value={weekSelectValue || "custom"}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v === "custom") return;
+            const preset = weekPresets.find((p) => p.value === v);
+            if (!preset) return;
+            navigate({ from: preset.mondayYmd, to: preset.sundayYmd });
+          }}
+          className="h-10 w-full max-w-md rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:ring-2 focus:ring-zinc-400 dark:border-zinc-800 dark:bg-black dark:text-zinc-50"
+        >
+          <option value="custom">Custom range (use dates below)</option>
+          {weekPresets.map((p) => (
+            <option key={p.value} value={p.value}>
+              {p.label} ({p.mondayYmd} – {p.sundayYmd})
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div className="flex flex-col gap-1.5">
         <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
           From
@@ -89,12 +127,13 @@ export function StatsFilters({
           className="h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:ring-2 focus:ring-zinc-400 dark:border-zinc-800 dark:bg-black dark:text-zinc-50"
         >
           <option value="">All categories</option>
-          {categories.map((c) => (
+          {categoriesForPicker.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}
             </option>
           ))}
         </select>
+      </div>
       </div>
     </div>
   );
