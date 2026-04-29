@@ -11,6 +11,7 @@ type ImportV1 = {
     color?: string | null;
     sortOrder?: number;
     isArchived?: boolean;
+    weeklyTargetHours?: number | null;
   }>;
   sessions: Array<{
     kind: "MANUAL" | "TIMER";
@@ -65,6 +66,17 @@ function parseImportV1(value: unknown): { ok: true; data: ImportV1 } | { ok: fal
     if (!isRecord(item)) return { ok: false, error: "Invalid category entry." };
     const name = typeof item.name === "string" ? item.name.trim() : "";
     if (!name) return { ok: false, error: "Category `name` is required." };
+    const weeklyTargetHours =
+      "weeklyTargetHours" in item &&
+      typeof item.weeklyTargetHours === "number" &&
+      Number.isFinite(item.weeklyTargetHours)
+        ? item.weeklyTargetHours
+        : "weeklyTargetHours" in item && item.weeklyTargetHours === null
+          ? null
+          : undefined;
+    if (typeof weeklyTargetHours === "number" && weeklyTargetHours < 0) {
+      return { ok: false, error: "Category `weeklyTargetHours` must be >= 0." };
+    }
     categories.push({
       name,
       color:
@@ -79,6 +91,7 @@ function parseImportV1(value: unknown): { ok: true; data: ImportV1 } | { ok: fal
         "isArchived" in item && typeof item.isArchived === "boolean"
           ? item.isArchived
           : undefined,
+      weeklyTargetHours,
     });
   }
 
@@ -184,14 +197,28 @@ export async function POST(request: Request) {
       for (const c of existingCategories) categoryNameToId.set(c.name, c.id);
 
       let categoriesCreated = 0;
+      let categoriesUpdated = 0;
       for (const c of parsed.data.categories) {
-        if (categoryNameToId.has(c.name)) continue;
+        const existingId = categoryNameToId.get(c.name);
+        if (existingId) {
+          if (c.weeklyTargetHours !== undefined) {
+            await tx.category.update({
+              where: { id: existingId },
+              data: { weeklyTargetHours: c.weeklyTargetHours },
+            });
+            categoriesUpdated += 1;
+          }
+          continue;
+        }
         const created = await tx.category.create({
           data: {
             name: c.name,
             color: c.color ?? null,
             sortOrder: typeof c.sortOrder === "number" ? c.sortOrder : 0,
             isArchived: typeof c.isArchived === "boolean" ? c.isArchived : false,
+            ...(c.weeklyTargetHours !== undefined
+              ? { weeklyTargetHours: c.weeklyTargetHours }
+              : {}),
           },
           select: { id: true, name: true },
         });
@@ -221,10 +248,13 @@ export async function POST(request: Request) {
         sessionsCreated += 1;
       }
 
-      return { categoriesCreated, sessionsCreated };
+      return { categoriesCreated, categoriesUpdated, sessionsCreated };
     });
 
-    return Response.json({ ok: true, data: { ...result, warnings } });
+    return Response.json({
+      ok: true,
+      data: { ...result, warnings },
+    });
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError) {
       if (err.code === "P2002") return jsonError("Import would violate a uniqueness constraint.", 409);

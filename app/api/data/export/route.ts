@@ -10,6 +10,7 @@ type ExportV1 = {
     color: string | null;
     sortOrder: number;
     isArchived: boolean;
+    weeklyTargetHours: number | null;
   }>;
   sessions: Array<{
     kind: "MANUAL" | "TIMER";
@@ -28,7 +29,13 @@ export async function GET() {
   const [categories, sessions] = await Promise.all([
     prisma.category.findMany({
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-      select: { name: true, color: true, sortOrder: true, isArchived: true },
+      select: {
+        name: true,
+        color: true,
+        sortOrder: true,
+        isArchived: true,
+        weeklyTargetHours: true,
+      },
     }),
     prisma.session.findMany({
       orderBy: [{ occurredAt: "desc" }, { createdAt: "desc" }],
@@ -44,6 +51,10 @@ export async function GET() {
       color: c.color ?? null,
       sortOrder: c.sortOrder ?? 0,
       isArchived: Boolean(c.isArchived),
+      weeklyTargetHours:
+        typeof c.weeklyTargetHours === "number" && Number.isFinite(c.weeklyTargetHours)
+          ? c.weeklyTargetHours
+          : null,
     })),
     sessions: sessions.map((s) => ({
       kind: s.kind,

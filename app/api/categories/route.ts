@@ -47,8 +47,22 @@ export async function POST(request: Request) {
     "isArchived" in body && typeof body.isArchived === "boolean"
       ? body.isArchived
       : undefined;
+  const weeklyTargetHoursRaw =
+    "weeklyTargetHours" in body &&
+    typeof body.weeklyTargetHours === "number" &&
+    Number.isFinite(body.weeklyTargetHours)
+      ? body.weeklyTargetHours
+      : "weeklyTargetHours" in body && body.weeklyTargetHours === null
+        ? null
+        : undefined;
 
   if (!name) return jsonError("`name` is required.");
+  if (
+    typeof weeklyTargetHoursRaw === "number" &&
+    (weeklyTargetHoursRaw < 0 || !Number.isFinite(weeklyTargetHoursRaw))
+  ) {
+    return jsonError("`weeklyTargetHours` must be >= 0 or null.");
+  }
 
   try {
     const created = await prisma.category.create({
@@ -57,6 +71,9 @@ export async function POST(request: Request) {
         color: color || null,
         sortOrder: typeof sortOrder === "number" ? Math.trunc(sortOrder) : 0,
         isArchived: typeof isArchived === "boolean" ? isArchived : false,
+        ...(weeklyTargetHoursRaw !== undefined
+          ? { weeklyTargetHours: weeklyTargetHoursRaw }
+          : {}),
       },
     });
 

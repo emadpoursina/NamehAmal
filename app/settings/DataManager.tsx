@@ -5,7 +5,15 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 type ImportResponse =
-  | { ok: true; data: { categoriesCreated: number; sessionsCreated: number; warnings: string[] } }
+  | {
+      ok: true;
+      data: {
+        categoriesCreated: number;
+        categoriesUpdated?: number;
+        sessionsCreated: number;
+        warnings: string[];
+      };
+    }
   | { ok: false; error: string };
 
 // Import a JSON export file into the local database.
@@ -31,6 +39,7 @@ export function DataManager() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{
     categoriesCreated: number;
+    categoriesUpdated?: number;
     sessionsCreated: number;
     warnings: string[];
   } | null>(null);
@@ -110,7 +119,11 @@ export function DataManager() {
       {result ? (
         <div className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-800 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200">
           <div>
-            Imported: {result.categoriesCreated} categories, {result.sessionsCreated} sessions.
+            Imported: {result.categoriesCreated} categories created
+            {typeof result.categoriesUpdated === "number" && result.categoriesUpdated > 0
+              ? `, ${result.categoriesUpdated} category targets updated`
+              : ""}
+            , {result.sessionsCreated} sessions.
           </div>
           {result.warnings?.length ? (
             <ul className="mt-2 list-disc pl-5">

@@ -48,8 +48,22 @@ export async function PATCH(
     "isArchived" in body && typeof body.isArchived === "boolean"
       ? body.isArchived
       : undefined;
+  const weeklyTargetHours =
+    "weeklyTargetHours" in body &&
+    typeof body.weeklyTargetHours === "number" &&
+    Number.isFinite(body.weeklyTargetHours)
+      ? body.weeklyTargetHours
+      : "weeklyTargetHours" in body && body.weeklyTargetHours === null
+        ? null
+        : undefined;
 
   if (name !== undefined && !name) return jsonError("`name` must be non-empty.");
+  if (
+    typeof weeklyTargetHours === "number" &&
+    (weeklyTargetHours < 0 || !Number.isFinite(weeklyTargetHours))
+  ) {
+    return jsonError("`weeklyTargetHours` must be >= 0 or null.");
+  }
 
   try {
     const updated = await prisma.category.update({
@@ -60,6 +74,7 @@ export async function PATCH(
         ...(colorNull === null ? { color: null } : {}),
         ...(typeof sortOrder === "number" ? { sortOrder } : {}),
         ...(typeof isArchived === "boolean" ? { isArchived } : {}),
+        ...(weeklyTargetHours !== undefined ? { weeklyTargetHours } : {}),
       },
     });
     return Response.json({ ok: true, data: updated });
