@@ -19,9 +19,11 @@ async function createCategory(payload: { name: string; color: string | null }) {
 }
 
 // Update a category by PATCHing the category API.
-async function patchCategory(
+export async function patchCategory(
   id: string,
-  payload: Partial<Pick<CategoryModel, "name" | "color" | "isArchived" | "sortOrder">>,
+  payload: Partial<
+    Pick<CategoryModel, "name" | "color" | "isArchived" | "sortOrder" | "weeklyTargetHours">
+  >,
 ) {
   const res = await fetch(`/api/categories/${encodeURIComponent(id)}`, {
     method: "PATCH",
