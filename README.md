@@ -60,7 +60,7 @@ This project exposes minimal server endpoints (create + list) for **categories**
 
 ## Stats filters
 
-The Stats page at `/stats` uses `from`, `to` (local `YYYY-MM-DD`), and optional `categoryId`. If `from` / `to` are missing or invalid, the range defaults to the **current week** (local Monday through Sunday). A week dropdown sets `from` and `to` accordingly.
+The Stats page at `/stats` uses `from`, `to` (`YYYY-MM-DD` in your configured **default timezone**), and optional `categoryId`. If `from` / `to` are missing or invalid, the range defaults to the **current week** (Monday through Sunday) in the default timezone. A week dropdown sets `from` and `to` accordingly.
 
 ## Dashboard filters
 
@@ -73,8 +73,8 @@ Sessions in the table include a **Record again** action that starts a new live t
 
 These filters are translated into `/api/sessions` query params:
 
-- `occurredFrom` = selected day at `00:00:00.000` (local time, sent as ISO)
-- `occurredTo` = selected day at `23:59:59.999` (local time, sent as ISO)
+- `occurredFrom` = selected day at `00:00:00.000` (default timezone, sent as ISO)
+- `occurredTo` = selected day at `23:59:59.999` (default timezone, sent as ISO)
 
 ### Categories
 
@@ -100,6 +100,10 @@ curl -sS -X POST "http://localhost:3000/api/categories" \
 - **Create**: `POST /api/sessions`
 - **Update**: `PATCH /api/sessions/:id`
 - **Delete**: `DELETE /api/sessions/:id`
+
+Timezone notes:
+- The app stores a per-session `timeZone` (IANA, e.g. `Asia/Yerevan`) and an optional `timeZoneOffsetMinutes` for audit/DST history.
+- You can configure the **default timezone** in Settings; new sessions will use it unless you override the timezone in the session form/tracker.
 
 Example:
 

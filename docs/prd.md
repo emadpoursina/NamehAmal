@@ -208,6 +208,12 @@ Implementation notes:
 - `occurredAt`: timestamp used for date filtering (manual date or timer start)
 - `startedAt` / `endedAt`: timer timestamps (nullable; `endedAt` nullable while running)
 - `durationSeconds`: total duration (manual duration or computed on stop)
+- `timeZone`: IANA timezone captured for this session (e.g. `Asia/Yerevan`)
+- `timeZoneOffsetMinutes`: UTC offset minutes at the time of `occurredAt` (optional; helps preserve DST history)
+
+### AppSettings
+- Singleton settings row used for app defaults
+- `timeZone`: default timezone used for new sessions and date-range filters
 
 ---
 
