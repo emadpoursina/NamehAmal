@@ -88,3 +88,36 @@ export async function PATCH(
   }
 }
 
+// Delete a category only when it has no sessions.
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id?: string }> },
+) {
+  const id = getId(await params);
+  if (!id) return jsonError("`id` is required.", 400);
+
+  const sessionsCount = await prisma.session.count({ where: { categoryId: id } });
+  if (sessionsCount > 0) {
+    return jsonError(
+      "Cannot delete category while it has sessions. Move/delete those sessions first.",
+      409,
+    );
+  }
+
+  try {
+    const deleted = await prisma.category.delete({ where: { id } });
+    return Response.json({ ok: true, data: deleted });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError) {
+      if (err.code === "P2025") return jsonError("Category not found.", 404);
+      if (err.code === "P2003" || err.code === "P2014") {
+        return jsonError(
+          "Cannot delete category while it has sessions. Move/delete those sessions first.",
+          409,
+        );
+      }
+    }
+    return jsonError("Failed to delete category.", 500);
+  }
+}
+
