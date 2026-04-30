@@ -157,13 +157,15 @@ Implementation notes:
 ### 5. Settings (`/settings`)
 - Manage categories:
   - add
-  - remove
+  - remove (archive/restore)
+  - delete (only if category has no sessions)
 - **Weekly targets**: planned hours per week (Monday–Sunday, local time) per **active** category; stored as `weeklyTargetHours` on `Category` (`null` = no target).
 - Export data (JSON / CSV)
 - Import data
 
 Implementation notes:
-- “Remove” = archive/restore (no hard delete).
+- “Remove” = archive/restore.
+- Hard delete is allowed only when there are **zero sessions** referencing the category.
 - Reordering uses simple Up/Down controls and persists via `sortOrder`.
 - Data import/export (v1):
   - Export format is **versioned JSON** (CSV can be added later).
