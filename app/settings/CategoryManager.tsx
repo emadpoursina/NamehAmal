@@ -36,6 +36,17 @@ export async function patchCategory(
   }
 }
 
+// Delete a category by DELETEing the category API.
+async function deleteCategory(id: string) {
+  const res = await fetch(`/api/categories/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+  const json = (await res.json()) as { ok: boolean; error?: string };
+  if (!res.ok || !json.ok) {
+    throw new Error(json.error || `Failed to delete category (${res.status}).`);
+  }
+}
+
 // Render Settings UI for adding, archiving/restoring, and reordering categories.
 export function CategoryManager({
   active,
@@ -109,6 +120,25 @@ export function CategoryManager({
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to restore category.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  // Delete an archived category if it has no sessions.
+  async function onDelete(id: string) {
+    setError(null);
+    const ok = confirm(
+      "Delete this category? This is only allowed if it has no sessions.",
+    );
+    if (!ok) return;
+
+    try {
+      setIsSaving(true);
+      await deleteCategory(id);
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete category.");
     } finally {
       setIsSaving(false);
     }
@@ -277,14 +307,24 @@ export function CategoryManager({
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => onRestore(c.id)}
-                  disabled={isSaving}
-                  className="rounded-md border border-zinc-200 bg-white px-2.5 py-1 text-xs font-medium text-zinc-800 hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-800 dark:bg-black dark:text-zinc-200 dark:hover:bg-zinc-950"
-                >
-                  Restore
-                </button>
+                <div className="inline-flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onRestore(c.id)}
+                    disabled={isSaving}
+                    className="rounded-md border border-zinc-200 bg-white px-2.5 py-1 text-xs font-medium text-zinc-800 hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-800 dark:bg-black dark:text-zinc-200 dark:hover:bg-zinc-950"
+                  >
+                    Restore
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onDelete(c.id)}
+                    disabled={isSaving}
+                    className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-800 hover:bg-red-100 disabled:opacity-50 dark:border-red-900 dark:bg-red-950 dark:text-red-200 dark:hover:bg-red-900/40"
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
             ))}
           </div>
