@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { CategoryModel } from "@/app/generated/prisma/models";
 import {
-  buildWeekPresetOptions,
+  buildWeekPresetOptionsInTimeZone,
   matchingWeekPresetValue,
 } from "@/app/lib/local-week";
 
@@ -39,14 +39,16 @@ export function StatsFilters({
   activeFrom,
   activeTo,
   activeCategoryId,
+  timeZone,
 }: {
   categories: CategoryModel[];
   activeFrom: string;
   activeTo: string;
   activeCategoryId: string | null;
+  timeZone: string;
 }) {
   const navigate = useStatsFilterNavigation();
-  const weekPresets = useMemo(() => buildWeekPresetOptions(12), []);
+  const weekPresets = useMemo(() => buildWeekPresetOptionsInTimeZone(timeZone, 12), [timeZone]);
   const weekSelectValue = useMemo(
     () => matchingWeekPresetValue(activeFrom, activeTo, weekPresets),
     [activeFrom, activeTo, weekPresets],

@@ -4,30 +4,10 @@ import { AddSessionForm } from "@/app/dashboard/AddSessionForm";
 import { DashboardFilters } from "@/app/dashboard/DashboardFilters";
 import { SessionsTable } from "@/app/dashboard/SessionsTable";
 import { TrackerCard } from "@/app/dashboard/TrackerCard";
+import { formatYmdInTimeZone, ymdToUtcRangeInTimeZone } from "@/app/lib/timezone";
+import { getDefaultTimeZone } from "@/app/server/app-settings";
 
 type SessionWithCategory = SessionModel & { category: CategoryModel };
-
-// Format a Date as YYYY-MM-DD in local time.
-function formatYmdLocal(date: Date) {
-  const y = date.getFullYear();
-  const m = `${date.getMonth() + 1}`.padStart(2, "0");
-  const d = `${date.getDate()}`.padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
-// Convert YYYY-MM-DD to a local-day [from,to] range.
-function ymdToLocalRange(ymd: string) {
-  const [yRaw, mRaw, dRaw] = ymd.split("-");
-  const y = Number.parseInt(yRaw ?? "", 10);
-  const m = Number.parseInt(mRaw ?? "", 10);
-  const d = Number.parseInt(dRaw ?? "", 10);
-  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return null;
-
-  const from = new Date(y, m - 1, d, 0, 0, 0, 0);
-  const to = new Date(y, m - 1, d, 23, 59, 59, 999);
-  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return null;
-  return { from, to };
-}
 
 // Build an absolute URL for internal API fetches.
 async function getBaseUrl() {
@@ -49,15 +29,17 @@ export default async function DashboardPage({
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const defaultTimeZone = await getDefaultTimeZone();
+
   // Parse searchParams for date and categoryId
   const sp = (await searchParams) ?? {};
   const dateRaw = typeof sp.date === "string" ? sp.date : "";
   const categoryId = typeof sp.categoryId === "string" ? sp.categoryId : "";
 
   // Compute the active date, defaulting to today if not specified or invalid
-  const todayYmd = formatYmdLocal(new Date());
-  const activeDate = ymdToLocalRange(dateRaw) ? dateRaw : todayYmd;
-  const range = ymdToLocalRange(activeDate);
+  const todayYmd = formatYmdInTimeZone(new Date(), defaultTimeZone);
+  const activeDate = ymdToUtcRangeInTimeZone(dateRaw, defaultTimeZone) ? dateRaw : todayYmd;
+  const range = ymdToUtcRangeInTimeZone(activeDate, defaultTimeZone);
 
   // Build the base URL for API requests
   const baseUrl = await getBaseUrl();

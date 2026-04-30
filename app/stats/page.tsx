@@ -2,11 +2,12 @@ import { headers } from "next/headers";
 import type { CategoryModel } from "@/app/generated/prisma/models";
 import { formatDuration } from "@/app/dashboard/format";
 import {
-  addDaysToYmd,
-  formatYmdLocal,
-  isMondayThroughSundayWeek,
-  startOfWeekMondayLocal,
+  addDaysToYmdUtc,
+  isMondayThroughSundayWeekInTimeZone,
+  startOfWeekMondayYmdInTimeZone,
 } from "@/app/lib/local-week";
+import { ymdToUtcRangeInTimeZone } from "@/app/lib/timezone";
+import { getDefaultTimeZone } from "@/app/server/app-settings";
 import { StatsFilters } from "@/app/stats/StatsFilters";
 import { WeekGoalsTable, type WeekGoalRow } from "@/app/stats/WeekGoalsTable";
 
@@ -29,20 +30,6 @@ type CategoriesStatsResponse = {
   error?: string;
 };
 
-// Convert YYYY-MM-DD to a local-day [from,to] range.
-function ymdToLocalRange(ymd: string) {
-  const [yRaw, mRaw, dRaw] = ymd.split("-");
-  const y = Number.parseInt(yRaw ?? "", 10);
-  const m = Number.parseInt(mRaw ?? "", 10);
-  const d = Number.parseInt(dRaw ?? "", 10);
-  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return null;
-
-  const from = new Date(y, m - 1, d, 0, 0, 0, 0);
-  const to = new Date(y, m - 1, d, 23, 59, 59, 999);
-  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return null;
-  return { from, to };
-}
-
 // Build an absolute URL for internal API fetches.
 async function getBaseUrl() {
   const h = await headers();
@@ -64,15 +51,17 @@ export default async function StatsPage({
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const defaultTimeZone = await getDefaultTimeZone();
+
   const sp = (await searchParams) ?? {};
   const fromRaw = typeof sp.from === "string" ? sp.from : "";
   const toRaw = typeof sp.to === "string" ? sp.to : "";
   const categoryId = typeof sp.categoryId === "string" ? sp.categoryId : "";
 
-  const fromOk = Boolean(ymdToLocalRange(fromRaw));
-  const toOk = Boolean(ymdToLocalRange(toRaw));
-  const thisWeekMonday = formatYmdLocal(startOfWeekMondayLocal(new Date()));
-  const thisWeekSunday = addDaysToYmd(thisWeekMonday, 6) ?? thisWeekMonday;
+  const fromOk = Boolean(ymdToUtcRangeInTimeZone(fromRaw, defaultTimeZone));
+  const toOk = Boolean(ymdToUtcRangeInTimeZone(toRaw, defaultTimeZone));
+  const thisWeekMonday = startOfWeekMondayYmdInTimeZone(defaultTimeZone, new Date());
+  const thisWeekSunday = addDaysToYmdUtc(thisWeekMonday, 6) ?? thisWeekMonday;
 
   let fromYmd: string;
   let toYmd: string;
@@ -85,8 +74,8 @@ export default async function StatsPage({
     toYmd = thisWeekSunday;
   }
 
-  const fromRange = ymdToLocalRange(fromYmd);
-  const toRange = ymdToLocalRange(toYmd);
+  const fromRange = ymdToUtcRangeInTimeZone(fromYmd, defaultTimeZone);
+  const toRange = ymdToUtcRangeInTimeZone(toYmd, defaultTimeZone);
   const occurredFrom = fromRange?.from ?? new Date();
   const occurredTo = toRange?.to ?? new Date();
 
@@ -131,7 +120,7 @@ export default async function StatsPage({
       return ao - bo;
     });
 
-  const isGoalsWeek = isMondayThroughSundayWeek(fromYmd, toYmd);
+  const isGoalsWeek = isMondayThroughSundayWeekInTimeZone(fromYmd, toYmd, defaultTimeZone);
   const showGoalsSection = goalRows.length > 0;
 
   return (
@@ -151,6 +140,7 @@ export default async function StatsPage({
           activeFrom={fromYmd}
           activeTo={toYmd}
           activeCategoryId={categoryId || null}
+          timeZone={defaultTimeZone}
         />
         <div className="text-xs text-zinc-500 dark:text-zinc-400">
           Total: {formatDuration(totalSeconds)}
