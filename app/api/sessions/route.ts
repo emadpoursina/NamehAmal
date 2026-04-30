@@ -1,4 +1,6 @@
 import { Prisma } from "@/app/generated/prisma/client";
+import { isValidIanaTimeZone, offsetMinutesAt } from "@/app/lib/timezone";
+import { getDefaultTimeZone } from "@/app/server/app-settings";
 import { prisma } from "@/app/server/db";
 
 export const runtime = "nodejs";
@@ -71,6 +73,10 @@ export async function POST(request: Request) {
     "categoryId" in body && typeof body.categoryId === "string"
       ? body.categoryId
       : null;
+  const timeZoneRaw =
+    "timeZone" in body && typeof body.timeZone === "string"
+      ? body.timeZone.trim()
+      : "";
   const occurredAt =
     "occurredAt" in body && typeof body.occurredAt === "string"
       ? parseDate(body.occurredAt)
@@ -95,6 +101,12 @@ export async function POST(request: Request) {
     return jsonError("`durationSeconds` must be > 0.");
   }
 
+  const defaultTimeZone = await getDefaultTimeZone();
+  const timeZone = timeZoneRaw ? timeZoneRaw : defaultTimeZone;
+  if (!isValidIanaTimeZone(timeZone)) {
+    return jsonError("`timeZone` must be a valid IANA timezone (e.g. \"Asia/Yerevan\").");
+  }
+
   if (kind === "TIMER") {
     if (!startedAt) return jsonError("`startedAt` is required for TIMER.");
     if (endedAt && endedAt.getTime() < startedAt.getTime()) {
@@ -104,6 +116,8 @@ export async function POST(request: Request) {
 
   const category = await prisma.category.findUnique({ where: { id: categoryId } });
   if (!category) return jsonError("Category not found.", 404);
+
+  const timeZoneOffsetMinutes = offsetMinutesAt(occurredAt, timeZone);
 
   try {
     const created = await prisma.session.create({
@@ -116,6 +130,8 @@ export async function POST(request: Request) {
         startedAt: startedAt ?? null,
         endedAt: endedAt ?? null,
         durationSeconds,
+        timeZone,
+        timeZoneOffsetMinutes,
       },
       include: { category: true },
     });

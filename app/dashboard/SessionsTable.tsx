@@ -3,13 +3,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { CategoryModel, SessionModel } from "@/app/generated/prisma/models";
-import { formatDateLocalYmd, formatDuration, formatTimeLocal } from "@/app/dashboard/format";
+import { formatDuration } from "@/app/dashboard/format";
 import { EditSessionDialog } from "@/app/dashboard/EditSessionDialog";
+import { formatHmInTimeZone, formatYmdInTimeZone } from "@/app/lib/timezone";
 
 type SessionWithCategory = SessionModel & { category: CategoryModel };
 
 // Start a new timer session (live tracker).
-async function startTimer(payload: { categoryId: string; title: string | null }) {
+async function startTimer(payload: { categoryId: string; title: string | null; timeZone: string }) {
   const res = await fetch("/api/tracker", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -80,10 +81,10 @@ export function SessionsTable({
               className="border-t border-zinc-100 text-zinc-900 hover:bg-zinc-50/50 dark:border-zinc-900 dark:text-zinc-50 dark:hover:bg-zinc-950/50"
             >
               <td className="px-4 py-3 font-mono text-xs text-zinc-700 dark:text-zinc-300">
-                {formatDateLocalYmd(s.occurredAt)}
+                {formatYmdInTimeZone(s.occurredAt, s.timeZone || "Asia/Yerevan")}
               </td>
               <td className="px-4 py-3 font-mono text-xs text-zinc-700 dark:text-zinc-300">
-                {formatTimeLocal(s.occurredAt)}
+                {formatHmInTimeZone(s.occurredAt, s.timeZone || "Asia/Yerevan")}
               </td>
               <td className="px-4 py-3">
                 <div className="flex flex-col gap-0.5">
@@ -121,6 +122,7 @@ export function SessionsTable({
                         await startTimer({
                           categoryId: s.categoryId,
                           title: s.title?.trim() ? s.title.trim() : null,
+                          timeZone: s.timeZone || "Asia/Yerevan",
                         });
                         router.refresh();
                       } catch (err) {

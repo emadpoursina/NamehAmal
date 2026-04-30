@@ -1,4 +1,6 @@
 import { Prisma } from "@/app/generated/prisma/client";
+import { isValidIanaTimeZone, offsetMinutesAt } from "@/app/lib/timezone";
+import { getDefaultTimeZone } from "@/app/server/app-settings";
 import { prisma } from "@/app/server/db";
 
 export const runtime = "nodejs";
@@ -74,12 +76,17 @@ export async function PATCH(
     "durationSeconds" in body && typeof body.durationSeconds === "number"
       ? Math.trunc(body.durationSeconds)
       : undefined;
+  const timeZoneRaw =
+    "timeZone" in body && typeof body.timeZone === "string" ? body.timeZone.trim() : undefined;
 
   if (durationSeconds !== undefined && (!durationSeconds || durationSeconds <= 0)) {
     return jsonError("`durationSeconds` must be > 0.");
   }
   if (occurredAt !== undefined && !occurredAt) {
     return jsonError("`occurredAt` must be a valid ISO date.");
+  }
+  if (timeZoneRaw !== undefined && timeZoneRaw && !isValidIanaTimeZone(timeZoneRaw)) {
+    return jsonError("`timeZone` must be a valid IANA timezone (e.g. \"Asia/Yerevan\").");
   }
 
   if (categoryId !== undefined) {
@@ -88,6 +95,19 @@ export async function PATCH(
   }
 
   try {
+    const current =
+      occurredAt !== undefined || timeZoneRaw !== undefined
+        ? await prisma.session.findUnique({ where: { id }, select: { occurredAt: true, timeZone: true } })
+        : null;
+
+    const nextTimeZone =
+      timeZoneRaw !== undefined
+        ? timeZoneRaw || (await getDefaultTimeZone())
+        : current?.timeZone;
+    const nextOccurredAt = occurredAt !== undefined ? occurredAt : current?.occurredAt;
+    const timeZoneOffsetMinutes =
+      nextTimeZone && nextOccurredAt ? offsetMinutesAt(nextOccurredAt, nextTimeZone) : undefined;
+
     const updated = await prisma.session.update({
       where: { id },
       data: {
@@ -96,6 +116,8 @@ export async function PATCH(
         ...(categoryId !== undefined ? { categoryId } : {}),
         ...(occurredAt !== undefined ? { occurredAt } : {}),
         ...(durationSeconds !== undefined ? { durationSeconds } : {}),
+        ...(timeZoneRaw !== undefined ? { timeZone: timeZoneRaw || (await getDefaultTimeZone()) } : {}),
+        ...(timeZoneOffsetMinutes !== undefined ? { timeZoneOffsetMinutes } : {}),
       },
       include: { category: true },
     });

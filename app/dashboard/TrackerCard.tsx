@@ -7,6 +7,10 @@ import { formatDuration } from "@/app/dashboard/format";
 
 type SessionWithCategory = SessionModel & { category: CategoryModel };
 
+type SettingsResponse =
+  | { ok: true; data: { id: string; timeZone: string } }
+  | { ok: false; error: string };
+
 // Fetch the currently active timer session (if any).
 async function fetchActiveTimer(): Promise<SessionWithCategory | null> {
   const res = await fetch("/api/tracker", { cache: "no-store" });
@@ -21,8 +25,18 @@ async function fetchActiveTimer(): Promise<SessionWithCategory | null> {
   return json.data ?? null;
 }
 
+// Fetch the app's default timezone setting.
+async function fetchDefaultTimeZone(): Promise<string> {
+  const res = await fetch("/api/settings", { cache: "no-store" });
+  const json = (await res.json()) as SettingsResponse;
+  if (!res.ok || !json.ok) {
+    throw new Error(!json.ok ? json.error : `Failed to load settings (${res.status}).`);
+  }
+  return json.data.timeZone || "Asia/Yerevan";
+}
+
 // Start a new timer session.
-async function startTimer(payload: { categoryId: string; title: string | null }) {
+async function startTimer(payload: { categoryId: string; title: string | null; timeZone: string }) {
   const res = await fetch("/api/tracker", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -60,6 +74,7 @@ export function TrackerCard({ categories }: { categories: CategoryModel[] }) {
   const [active, setActive] = useState<SessionWithCategory | null>(null);
   const [categoryId, setCategoryId] = useState(defaultCategoryId);
   const [title, setTitle] = useState("");
+  const [timeZone, setTimeZone] = useState("Asia/Yerevan");
   const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -76,6 +91,20 @@ export function TrackerCard({ categories }: { categories: CategoryModel[] }) {
       })
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load timer.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchDefaultTimeZone()
+      .then((tz) => {
+        if (!cancelled) setTimeZone(tz);
+      })
+      .catch(() => {
+        // Keep fallback timezone.
       });
     return () => {
       cancelled = true;
@@ -102,11 +131,13 @@ export function TrackerCard({ categories }: { categories: CategoryModel[] }) {
     setError(null);
     if (!categoryId) return setError("Category is required.");
     if (!categories.length) return setError("No categories available.");
+    if (!timeZone.trim()) return setError("Timezone is required.");
     try {
       setIsBusy(true);
       const created = await startTimer({
         categoryId,
         title: title.trim() ? title.trim() : null,
+        timeZone: timeZone.trim(),
       });
       setActive(created);
       setTitle("");
@@ -199,6 +230,18 @@ export function TrackerCard({ categories }: { categories: CategoryModel[] }) {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Optional"
+                className="h-10 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:ring-2 focus:ring-zinc-400 dark:border-zinc-800 dark:bg-black dark:text-zinc-50"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                Timezone
+              </label>
+              <input
+                value={timeZone}
+                onChange={(e) => setTimeZone(e.target.value)}
+                placeholder='e.g. "Asia/Yerevan"'
                 className="h-10 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:ring-2 focus:ring-zinc-400 dark:border-zinc-800 dark:bg-black dark:text-zinc-50"
               />
             </div>

@@ -1,17 +1,23 @@
 "use client";
 
 import type { FormEvent } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { CategoryModel } from "@/app/generated/prisma/models";
+import { ymdToUtcNoonIsoInTimeZone } from "@/app/lib/timezone";
 
-// Convert a YYYY-MM-DD date to a local Date at noon.
-function ymdToLocalNoon(ymd: string) {
-  const [yRaw, mRaw, dRaw] = ymd.split("-");
-  const y = Number.parseInt(yRaw ?? "", 10);
-  const m = Number.parseInt(mRaw ?? "", 10);
-  const d = Number.parseInt(dRaw ?? "", 10);
-  return new Date(y, m - 1, d, 12, 0, 0, 0);
+type SettingsResponse =
+  | { ok: true; data: { id: string; timeZone: string } }
+  | { ok: false; error: string };
+
+// Fetch the app's default timezone setting.
+async function fetchDefaultTimeZone(): Promise<string> {
+  const res = await fetch("/api/settings", { cache: "no-store" });
+  const json = (await res.json()) as SettingsResponse;
+  if (!res.ok || !json.ok) {
+    throw new Error(!json.ok ? json.error : `Failed to load settings (${res.status}).`);
+  }
+  return json.data.timeZone || "Asia/Yerevan";
 }
 
 // Create a manual session by POSTing to the sessions API.
@@ -20,6 +26,7 @@ async function createManualSession(payload: {
   categoryId: string;
   occurredAt: string;
   durationSeconds: number;
+  timeZone: string;
 }) {
   const res = await fetch("/api/sessions", {
     method: "POST",
@@ -48,8 +55,23 @@ export function AddSessionForm({
   const [title, setTitle] = useState("");
   const [categoryId, setCategoryId] = useState(defaultCategoryId);
   const [durationMinutes, setDurationMinutes] = useState(25);
+  const [timeZone, setTimeZone] = useState("Asia/Yerevan");
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchDefaultTimeZone()
+      .then((tz) => {
+        if (!cancelled) setTimeZone(tz);
+      })
+      .catch(() => {
+        // Keep fallback timezone.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -60,8 +82,10 @@ export function AddSessionForm({
       : 0;
     if (!categoryId) return setError("Category is required.");
     if (!minutes || minutes <= 0) return setError("Duration must be > 0 minutes.");
+    if (!timeZone.trim()) return setError("Timezone is required.");
 
-    const occurredAt = ymdToLocalNoon(activeDate).toISOString();
+    const occurredAt = ymdToUtcNoonIsoInTimeZone(activeDate, timeZone.trim());
+    if (!occurredAt) return setError("Invalid date or timezone.");
 
     try {
       setIsSaving(true);
@@ -70,6 +94,7 @@ export function AddSessionForm({
         categoryId,
         occurredAt,
         durationSeconds: minutes * 60,
+        timeZone: timeZone.trim(),
       });
       setTitle("");
       setDurationMinutes(25);
@@ -141,6 +166,18 @@ export function AddSessionForm({
               </option>
             ))}
           </select>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+            Timezone
+          </label>
+          <input
+            value={timeZone}
+            onChange={(e) => setTimeZone(e.target.value)}
+            placeholder='e.g. "Asia/Yerevan"'
+            className="h-10 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:ring-2 focus:ring-zinc-400 dark:border-zinc-800 dark:bg-black dark:text-zinc-50"
+          />
         </div>
 
         <div className="flex flex-col gap-1.5">

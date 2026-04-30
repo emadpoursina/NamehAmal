@@ -4,25 +4,9 @@ import type { FormEvent } from "react";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { CategoryModel, SessionModel } from "@/app/generated/prisma/models";
+import { formatYmdInTimeZone, ymdToUtcNoonIsoInTimeZone } from "@/app/lib/timezone";
 
 type SessionWithCategory = SessionModel & { category: CategoryModel };
-
-// Convert YYYY-MM-DD to a local Date at noon.
-function ymdToLocalNoon(ymd: string) {
-  const [yRaw, mRaw, dRaw] = ymd.split("-");
-  const y = Number.parseInt(yRaw ?? "", 10);
-  const m = Number.parseInt(mRaw ?? "", 10);
-  const d = Number.parseInt(dRaw ?? "", 10);
-  return new Date(y, m - 1, d, 12, 0, 0, 0);
-}
-
-// Format a Date as YYYY-MM-DD in local time.
-function formatYmdLocal(date: Date) {
-  const y = date.getFullYear();
-  const m = `${date.getMonth() + 1}`.padStart(2, "0");
-  const d = `${date.getDate()}`.padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
 
 // Update a session by id.
 async function updateSession(
@@ -32,6 +16,7 @@ async function updateSession(
     categoryId: string;
     occurredAt: string;
     durationSeconds: number;
+    timeZone: string;
   },
 ) {
   const res = await fetch(`/api/sessions/${encodeURIComponent(id)}`, {
@@ -63,7 +48,10 @@ export function EditSessionDialog({
 
   const [title, setTitle] = useState(session.title ?? "");
   const [categoryId, setCategoryId] = useState(defaultCategoryId);
-  const [dateYmd, setDateYmd] = useState(formatYmdLocal(new Date(session.occurredAt)));
+  const [timeZone, setTimeZone] = useState(session.timeZone || "Asia/Yerevan");
+  const [dateYmd, setDateYmd] = useState(
+    formatYmdInTimeZone(new Date(session.occurredAt), timeZone),
+  );
   const [durationMinutes, setDurationMinutes] = useState(
     Math.max(1, Math.round(session.durationSeconds / 60)),
   );
@@ -80,14 +68,19 @@ export function EditSessionDialog({
     if (!categoryId) return setError("Category is required.");
     if (!minutes || minutes <= 0) return setError("Duration must be > 0 minutes.");
     if (!dateYmd) return setError("Date is required.");
+    if (!timeZone.trim()) return setError("Timezone is required.");
+
+    const occurredAt = ymdToUtcNoonIsoInTimeZone(dateYmd, timeZone.trim());
+    if (!occurredAt) return setError("Invalid date or timezone.");
 
     try {
       setIsSaving(true);
       await updateSession(session.id, {
         title: title.trim() ? title.trim() : null,
         categoryId,
-        occurredAt: ymdToLocalNoon(dateYmd).toISOString(),
+        occurredAt,
         durationSeconds: minutes * 60,
+        timeZone: timeZone.trim(),
       });
       router.refresh();
       onClose();
@@ -138,6 +131,18 @@ export function EditSessionDialog({
               type="date"
               value={dateYmd}
               onChange={(e) => setDateYmd(e.target.value)}
+              className="h-10 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:ring-2 focus:ring-zinc-400 dark:border-zinc-800 dark:bg-black dark:text-zinc-50"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+              Timezone
+            </label>
+            <input
+              value={timeZone}
+              onChange={(e) => setTimeZone(e.target.value)}
+              placeholder='e.g. "Asia/Yerevan"'
               className="h-10 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:ring-2 focus:ring-zinc-400 dark:border-zinc-800 dark:bg-black dark:text-zinc-50"
             />
           </div>
