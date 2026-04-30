@@ -23,6 +23,12 @@ async function main() {
   const { prisma } = createPrismaClient();
 
   try {
+    await prisma.appSettings.upsert({
+      where: { id: "singleton" },
+      update: {},
+      create: { id: "singleton", timeZone: "Asia/Yerevan" },
+    });
+
     await prisma.session.deleteMany();
     await prisma.category.deleteMany();
 
@@ -58,6 +64,7 @@ async function main() {
           startedAt: ninetyMinutesAgo,
           endedAt: thirtyMinutesAgo,
           durationSeconds: 60 * 60,
+          timeZone: "Asia/Yerevan",
         },
         {
           kind: "MANUAL",
@@ -68,6 +75,7 @@ async function main() {
           startedAt: null,
           endedAt: null,
           durationSeconds: 25 * 60,
+          timeZone: "Asia/Yerevan",
         },
       ],
     });

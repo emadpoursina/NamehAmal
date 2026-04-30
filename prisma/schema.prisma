@@ -60,6 +60,12 @@ model Session {
   /// Total session duration in seconds (manual duration or computed on stop).
   durationSeconds Int
 
+  /// IANA timezone (e.g. "Asia/Yerevan") captured for this session.
+  timeZone String     @default("Asia/Yerevan")
+
+  /// UTC offset in minutes at the time of `occurredAt` (useful for DST audits).
+  timeZoneOffsetMinutes Int?
+
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
 
@@ -67,4 +73,15 @@ model Session {
   @@index([categoryId, occurredAt])
   @@index([startedAt])
   @@index([endedAt])
+}
+
+model AppSettings {
+  /// Singleton row id (always "singleton").
+  id       String   @id @default("singleton")
+
+  /// Default timezone used for new sessions and date-range filters.
+  timeZone String   @default("Asia/Yerevan")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
