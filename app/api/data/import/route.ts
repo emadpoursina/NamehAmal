@@ -1,4 +1,5 @@
 import { Prisma } from "@/app/generated/prisma/client";
+import { isValidIanaTimeZone } from "@/app/lib/timezone";
 import { prisma } from "@/app/server/db";
 
 export const runtime = "nodejs";
@@ -24,6 +25,18 @@ type ImportV1 = {
     durationSeconds: number;
   }>;
 };
+
+type ImportV2 = {
+  version: 2;
+  exportedAt?: string;
+  categories: ImportV1["categories"];
+  sessions: Array<ImportV1["sessions"][number] & {
+    timeZone: string;
+    timeZoneOffsetMinutes?: number | null;
+  }>;
+};
+
+type ImportPayload = ImportV1 | ImportV2;
 
 // Build a consistent JSON error response.
 function jsonError(message: string, status = 400) {
@@ -51,10 +64,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object";
 }
 
-// Parse an import payload (v1) with validation.
-function parseImportV1(value: unknown): { ok: true; data: ImportV1 } | { ok: false; error: string } {
+// Parse an import payload (v1 or v2) with validation.
+function parseImportPayload(
+  value: unknown,
+): { ok: true; data: ImportPayload } | { ok: false; error: string } {
   if (!isRecord(value)) return { ok: false, error: "Invalid JSON body." };
-  if (value.version !== 1) return { ok: false, error: "`version` must be 1." };
+  if (value.version !== 1 && value.version !== 2) {
+    return { ok: false, error: "`version` must be 1 or 2." };
+  }
+  const version = value.version;
 
   const categoriesRaw = value.categories;
   const sessionsRaw = value.sessions;
@@ -95,7 +113,7 @@ function parseImportV1(value: unknown): { ok: true; data: ImportV1 } | { ok: fal
     });
   }
 
-  const sessions: ImportV1["sessions"] = [];
+  const sessions: ImportPayload["sessions"] = [];
   for (const item of sessionsRaw) {
     if (!isRecord(item)) return { ok: false, error: "Invalid session entry." };
 
@@ -142,6 +160,23 @@ function parseImportV1(value: unknown): { ok: true; data: ImportV1 } | { ok: fal
       return { ok: false, error: "Session `durationSeconds` must be > 0." };
     }
 
+    const timeZone =
+      version === 2 && typeof item.timeZone === "string" ? item.timeZone.trim() : "Asia/Yerevan";
+    if (!timeZone || !isValidIanaTimeZone(timeZone)) {
+      return {
+        ok: false,
+        error: "Session `timeZone` must be a valid IANA timezone (e.g. \"Asia/Yerevan\").",
+      };
+    }
+    const timeZoneOffsetMinutes =
+      version === 2 && "timeZoneOffsetMinutes" in item
+        ? typeof item.timeZoneOffsetMinutes === "number" && Number.isFinite(item.timeZoneOffsetMinutes)
+          ? Math.trunc(item.timeZoneOffsetMinutes)
+          : item.timeZoneOffsetMinutes === null
+            ? null
+            : undefined
+        : undefined;
+
     const title =
       "title" in item && (typeof item.title === "string" || item.title === null)
         ? typeof item.title === "string"
@@ -155,7 +190,7 @@ function parseImportV1(value: unknown): { ok: true; data: ImportV1 } | { ok: fal
           : null
         : undefined;
 
-    sessions.push({
+    const base = {
       kind,
       categoryName,
       occurredAt: occurredAt.toISOString(),
@@ -164,13 +199,23 @@ function parseImportV1(value: unknown): { ok: true; data: ImportV1 } | { ok: fal
       durationSeconds,
       ...(title !== undefined ? { title } : {}),
       ...(note !== undefined ? { note } : {}),
-    });
+    } as const;
+
+    if (version === 2) {
+      sessions.push({
+        ...base,
+        timeZone,
+        ...(timeZoneOffsetMinutes !== undefined ? { timeZoneOffsetMinutes } : {}),
+      });
+    } else {
+      sessions.push(base);
+    }
   }
 
   return {
     ok: true,
     data: {
-      version: 1,
+      version,
       exportedAt: typeof value.exportedAt === "string" ? value.exportedAt : undefined,
       categories,
       sessions,
@@ -181,7 +226,7 @@ function parseImportV1(value: unknown): { ok: true; data: ImportV1 } | { ok: fal
 // Import a v1 JSON export payload and merge into the local DB.
 export async function POST(request: Request) {
   const body = await readJson(request);
-  const parsed = parseImportV1(body);
+  const parsed = parseImportPayload(body);
   if (!parsed.ok) return jsonError(parsed.error, 400);
 
   const warnings: string[] = [
@@ -243,6 +288,13 @@ export async function POST(request: Request) {
             startedAt: s.startedAt ? new Date(s.startedAt) : null,
             endedAt: s.endedAt ? new Date(s.endedAt) : null,
             durationSeconds: s.durationSeconds,
+            timeZone: "timeZone" in s && typeof s.timeZone === "string" ? s.timeZone : "Asia/Yerevan",
+            timeZoneOffsetMinutes:
+              "timeZoneOffsetMinutes" in s && typeof s.timeZoneOffsetMinutes === "number"
+                ? s.timeZoneOffsetMinutes
+                : "timeZoneOffsetMinutes" in s && s.timeZoneOffsetMinutes === null
+                  ? null
+                  : undefined,
           },
         });
         sessionsCreated += 1;

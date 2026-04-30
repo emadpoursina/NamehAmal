@@ -2,8 +2,8 @@ import { prisma } from "@/app/server/db";
 
 export const runtime = "nodejs";
 
-type ExportV1 = {
-  version: 1;
+type ExportV2 = {
+  version: 2;
   exportedAt: string;
   categories: Array<{
     name: string;
@@ -21,6 +21,8 @@ type ExportV1 = {
     startedAt: string | null;
     endedAt: string | null;
     durationSeconds: number;
+    timeZone: string;
+    timeZoneOffsetMinutes: number | null;
   }>;
 };
 
@@ -43,8 +45,8 @@ export async function GET() {
     }),
   ]);
 
-  const payload: ExportV1 = {
-    version: 1,
+  const payload: ExportV2 = {
+    version: 2,
     exportedAt: new Date().toISOString(),
     categories: categories.map((c) => ({
       name: c.name,
@@ -65,6 +67,11 @@ export async function GET() {
       startedAt: s.startedAt ? s.startedAt.toISOString() : null,
       endedAt: s.endedAt ? s.endedAt.toISOString() : null,
       durationSeconds: Math.max(1, Math.trunc(s.durationSeconds ?? 0)),
+      timeZone: s.timeZone || "Asia/Yerevan",
+      timeZoneOffsetMinutes:
+        typeof s.timeZoneOffsetMinutes === "number" && Number.isFinite(s.timeZoneOffsetMinutes)
+          ? Math.trunc(s.timeZoneOffsetMinutes)
+          : null,
     })),
   };
 
