@@ -8,6 +8,19 @@ import { EditSessionDialog } from "@/app/dashboard/EditSessionDialog";
 
 type SessionWithCategory = SessionModel & { category: CategoryModel };
 
+// Start a new timer session (live tracker).
+async function startTimer(payload: { categoryId: string; title: string | null }) {
+  const res = await fetch("/api/tracker", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ action: "start", ...payload }),
+  });
+  const json = (await res.json()) as { ok: boolean; error?: string };
+  if (!res.ok || !json.ok) {
+    throw new Error(json.error || `Failed to start timer (${res.status}).`);
+  }
+}
+
 // Delete a session by id.
 async function deleteSession(id: string) {
   const res = await fetch(`/api/sessions/${encodeURIComponent(id)}`, {
@@ -30,6 +43,7 @@ export function SessionsTable({
   const router = useRouter();
   const [editing, setEditing] = useState<SessionWithCategory | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [recordingId, setRecordingId] = useState<string | null>(null);
 
   if (!sessions.length) {
     return (
@@ -98,6 +112,31 @@ export function SessionsTable({
               </td>
               <td className="px-4 py-3 text-right">
                 <div className="inline-flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={recordingId === s.id}
+                    onClick={async () => {
+                      try {
+                        setRecordingId(s.id);
+                        await startTimer({
+                          categoryId: s.categoryId,
+                          title: s.title?.trim() ? s.title.trim() : null,
+                        });
+                        router.refresh();
+                      } catch (err) {
+                        alert(
+                          err instanceof Error
+                            ? err.message
+                            : "Failed to start recording for this session.",
+                        );
+                      } finally {
+                        setRecordingId(null);
+                      }
+                    }}
+                    className="rounded-md border border-zinc-200 bg-white px-2.5 py-1 text-xs font-medium text-zinc-800 hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-800 dark:bg-black dark:text-zinc-200 dark:hover:bg-zinc-950"
+                  >
+                    {recordingId === s.id ? "Starting..." : "Record again"}
+                  </button>
                   <button
                     type="button"
                     onClick={() => setEditing(s)}

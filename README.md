@@ -69,6 +69,8 @@ The Dashboard lives at `/` and stores filters in the URL so they are shareable a
 - `date=YYYY-MM-DD`: the day to show (defaults to today)
 - `categoryId=<id>`: optional category filter
 
+Sessions in the table include a **Record again** action that starts a new live timer with the same category and title.
+
 These filters are translated into `/api/sessions` query params:
 
 - `occurredFrom` = selected day at `00:00:00.000` (local time, sent as ISO)
