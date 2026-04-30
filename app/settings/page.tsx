@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import type { CategoryModel } from "@/app/generated/prisma/models";
 import { CategoryManager } from "./CategoryManager";
 import { DataManager } from "./DataManager";
+import { TimezoneSettingsCard } from "./TimezoneSettingsCard";
 import { WeeklyTargetsCard } from "./WeeklyTargetsCard";
 
 // Build an absolute URL for internal API fetches.
@@ -41,6 +42,7 @@ export default async function SettingsPage() {
         </p>
       </div>
 
+      <TimezoneSettingsCard />
       <CategoryManager active={active} archived={archived} />
       <WeeklyTargetsCard
         key={active.map((c) => `${c.id}:${c.weeklyTargetHours ?? ""}:${c.sortOrder}`).join("|")}
