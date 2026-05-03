@@ -105,6 +105,10 @@ Timezone notes:
 - The app stores a per-session `timeZone` (IANA, e.g. `Asia/Yerevan`) and an optional `timeZoneOffsetMinutes` for audit/DST history.
 - You can configure the **default timezone** in Settings; new sessions will use it unless you override the timezone in the session form/tracker.
 
+Creating a **manual** session:
+- Either send `startedAt` and `endedAt` (ISO timestamps): duration is derived and `occurredAt` is set to `startedAt`.
+- Or send `occurredAt` and `durationSeconds` (legacy): no start/end times stored unless you also pass `startedAt` / `endedAt`.
+
 Example:
 
 ```bash
@@ -116,8 +120,9 @@ curl -sS -X POST "http://localhost:3000/api/sessions" \
     "kind":"MANUAL",
     "title":"Reading",
     "categoryId":"<category-id>",
-    "occurredAt":"2026-01-01T12:00:00.000Z",
-    "durationSeconds":1500
+    "timeZone":"Asia/Yerevan",
+    "startedAt":"2026-01-01T09:00:00.000Z",
+    "endedAt":"2026-01-01T09:25:00.000Z"
   }' | jq
 
 curl -sS -X PATCH "http://localhost:3000/api/sessions/<session-id>" \
