@@ -96,10 +96,6 @@ export async function POST(request: Request) {
 
   if (kind !== "MANUAL" && kind !== "TIMER") return jsonError("Invalid `kind`.");
   if (!categoryId) return jsonError("`categoryId` is required.");
-  if (!occurredAt) return jsonError("`occurredAt` must be a valid ISO date.");
-  if (!durationSeconds || durationSeconds <= 0) {
-    return jsonError("`durationSeconds` must be > 0.");
-  }
 
   const defaultTimeZone = await getDefaultTimeZone();
   const timeZone = timeZoneRaw ? timeZoneRaw : defaultTimeZone;
@@ -107,17 +103,47 @@ export async function POST(request: Request) {
     return jsonError("`timeZone` must be a valid IANA timezone (e.g. \"Asia/Yerevan\").");
   }
 
-  if (kind === "TIMER") {
-    if (!startedAt) return jsonError("`startedAt` is required for TIMER.");
-    if (endedAt && endedAt.getTime() < startedAt.getTime()) {
-      return jsonError("`endedAt` must be >= `startedAt`.");
+  const manualFromRange =
+    kind === "MANUAL" && startedAt && endedAt;
+  let occurredAtFinal: Date;
+  let durationSecondsFinal: number;
+  let startedAtFinal: Date | null;
+  let endedAtFinal: Date | null;
+
+  if (manualFromRange) {
+    if (endedAt.getTime() <= startedAt.getTime()) {
+      return jsonError("`endedAt` must be after `startedAt`.");
+    }
+    occurredAtFinal = startedAt;
+    durationSecondsFinal = Math.floor(
+      (endedAt.getTime() - startedAt.getTime()) / 1000,
+    );
+    if (!durationSecondsFinal) {
+      return jsonError("Session length must be at least 1 second.");
+    }
+    startedAtFinal = startedAt;
+    endedAtFinal = endedAt;
+  } else {
+    if (!occurredAt) return jsonError("`occurredAt` must be a valid ISO date.");
+    if (!durationSeconds || durationSeconds <= 0) {
+      return jsonError("`durationSeconds` must be > 0.");
+    }
+    occurredAtFinal = occurredAt;
+    durationSecondsFinal = durationSeconds;
+    startedAtFinal = startedAt ?? null;
+    endedAtFinal = endedAt ?? null;
+    if (kind === "TIMER") {
+      if (!startedAtFinal) return jsonError("`startedAt` is required for TIMER.");
+      if (endedAtFinal && endedAtFinal.getTime() < startedAtFinal.getTime()) {
+        return jsonError("`endedAt` must be >= `startedAt`.");
+      }
     }
   }
 
   const category = await prisma.category.findUnique({ where: { id: categoryId } });
   if (!category) return jsonError("Category not found.", 404);
 
-  const timeZoneOffsetMinutes = offsetMinutesAt(occurredAt, timeZone);
+  const timeZoneOffsetMinutes = offsetMinutesAt(occurredAtFinal, timeZone);
 
   try {
     const created = await prisma.session.create({
@@ -126,10 +152,10 @@ export async function POST(request: Request) {
         title: title || null,
         note: note || null,
         categoryId,
-        occurredAt,
-        startedAt: startedAt ?? null,
-        endedAt: endedAt ?? null,
-        durationSeconds,
+        occurredAt: occurredAtFinal,
+        startedAt: startedAtFinal,
+        endedAt: endedAtFinal,
+        durationSeconds: durationSecondsFinal,
         timeZone,
         timeZoneOffsetMinutes,
       },
