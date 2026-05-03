@@ -4,7 +4,7 @@ import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { CategoryModel } from "@/app/generated/prisma/models";
-import { ymdToUtcNoonIsoInTimeZone } from "@/app/lib/timezone";
+import { ymdAndHmToUtcIsoInTimeZone } from "@/app/lib/timezone";
 
 type SettingsResponse =
   | { ok: true; data: { id: string; timeZone: string } }
@@ -20,12 +20,12 @@ async function fetchDefaultTimeZone(): Promise<string> {
   return json.data.timeZone || "Asia/Yerevan";
 }
 
-// Create a manual session by POSTing to the sessions API.
+// Create a manual session from local start/end times (POST includes ISO `startedAt` / `endedAt`).
 async function createManualSession(payload: {
   title: string | null;
   categoryId: string;
-  occurredAt: string;
-  durationSeconds: number;
+  startedAt: string;
+  endedAt: string;
   timeZone: string;
 }) {
   const res = await fetch("/api/sessions", {
@@ -54,7 +54,8 @@ export function AddSessionForm({
   const [isOpen, setIsOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [categoryId, setCategoryId] = useState(defaultCategoryId);
-  const [durationMinutes, setDurationMinutes] = useState(25);
+  const [startTime, setStartTime] = useState("09:00");
+  const [endTime, setEndTime] = useState("09:25");
   const [timeZone, setTimeZone] = useState("Asia/Yerevan");
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -77,27 +78,36 @@ export function AddSessionForm({
     e.preventDefault();
     setError(null);
 
-    const minutes = Number.isFinite(durationMinutes)
-      ? Math.trunc(durationMinutes)
-      : 0;
     if (!categoryId) return setError("Category is required.");
-    if (!minutes || minutes <= 0) return setError("Duration must be > 0 minutes.");
     if (!timeZone.trim()) return setError("Timezone is required.");
+    if (!startTime.trim() || !endTime.trim()) {
+      return setError("Start and end time are required.");
+    }
 
-    const occurredAt = ymdToUtcNoonIsoInTimeZone(activeDate, timeZone.trim());
-    if (!occurredAt) return setError("Invalid date or timezone.");
+    const tz = timeZone.trim();
+    const startIso = ymdAndHmToUtcIsoInTimeZone(activeDate, startTime.trim(), tz);
+    let endIso = ymdAndHmToUtcIsoInTimeZone(activeDate, endTime.trim(), tz);
+    if (!startIso || !endIso) return setError("Invalid date, time, or timezone.");
+
+    let endMs = new Date(endIso).getTime();
+    const startMs = new Date(startIso).getTime();
+    if (endMs <= startMs) {
+      endMs += 24 * 60 * 60 * 1000;
+    }
+    const endedAtIso = new Date(endMs).toISOString();
 
     try {
       setIsSaving(true);
       await createManualSession({
         title: title.trim() ? title.trim() : null,
         categoryId,
-        occurredAt,
-        durationSeconds: minutes * 60,
-        timeZone: timeZone.trim(),
+        startedAt: startIso,
+        endedAt: endedAtIso,
+        timeZone: tz,
       });
       setTitle("");
-      setDurationMinutes(25);
+      setStartTime("09:00");
+      setEndTime("09:25");
       setIsOpen(false);
       router.refresh();
     } catch (err) {
@@ -180,19 +190,34 @@ export function AddSessionForm({
           />
         </div>
 
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-            Duration (minutes)
-          </label>
-          <input
-            type="number"
-            min={1}
-            step={1}
-            value={durationMinutes}
-            onChange={(e) => setDurationMinutes(Number(e.target.value))}
-            className="h-10 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:ring-2 focus:ring-zinc-400 dark:border-zinc-800 dark:bg-black dark:text-zinc-50"
-          />
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+              Start
+            </label>
+            <input
+              type="time"
+              value={startTime}
+              onChange={(e) => setStartTime(e.target.value)}
+              className="h-10 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:ring-2 focus:ring-zinc-400 dark:border-zinc-800 dark:bg-black dark:text-zinc-50"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+              End
+            </label>
+            <input
+              type="time"
+              value={endTime}
+              onChange={(e) => setEndTime(e.target.value)}
+              className="h-10 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:ring-2 focus:ring-zinc-400 dark:border-zinc-800 dark:bg-black dark:text-zinc-50"
+            />
+          </div>
         </div>
+        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+          Times are on the date shown below, in the selected timezone. If end is
+          earlier than start, the end is treated as the next day.
+        </p>
 
         {error ? (
           <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
