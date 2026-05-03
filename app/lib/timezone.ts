@@ -80,6 +80,38 @@ export function ymdToUtcRangeInTimeZone(
   return { from: new Date(fromMs), to: new Date(toMs) };
 }
 
+// Convert YYYY-MM-DD and local wall time (HH:MM or HH:MM:SS) in `timeZone` to a UTC ISO string.
+export function ymdAndHmToUtcIsoInTimeZone(
+  ymd: string,
+  hm: string,
+  timeZone: string,
+): string | null {
+  const [yRaw, mRaw, dRaw] = (ymd ?? "").split("-");
+  const year = Number.parseInt(yRaw ?? "", 10);
+  const month = Number.parseInt(mRaw ?? "", 10);
+  const day = Number.parseInt(dRaw ?? "", 10);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null;
+  if (!isValidIanaTimeZone(timeZone)) return null;
+
+  const hmNorm = (hm ?? "").trim();
+  const [hStr, mStr, sStr] = hmNorm.split(":");
+  const hour = Number.parseInt(hStr ?? "", 10);
+  const minute = Number.parseInt(mStr ?? "0", 10);
+  const second =
+    sStr !== undefined && sStr !== "" ? Number.parseInt(sStr, 10) : 0;
+  if (!Number.isFinite(hour) || !Number.isFinite(minute) || !Number.isFinite(second)) return null;
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59 || second < 0 || second > 59) {
+    return null;
+  }
+
+  const ms = zonedDateTimeToUtcMs(
+    { year, month, day, hour, minute, second },
+    0,
+    timeZone,
+  );
+  return new Date(ms).toISOString();
+}
+
 // Convert YYYY-MM-DD to a UTC ISO string for local noon in `timeZone`.
 export function ymdToUtcNoonIsoInTimeZone(ymd: string, timeZone: string): string | null {
   const [yRaw, mRaw, dRaw] = (ymd ?? "").split("-");
