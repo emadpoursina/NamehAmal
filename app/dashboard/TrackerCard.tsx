@@ -192,11 +192,19 @@ export function TrackerCard({ categories }: { categories: CategoryModel[] }) {
       <div className="mt-3 flex flex-col gap-3">
         {active ? (
           <>
-            <div className="flex items-center justify-between">
-              <div className="text-xs text-zinc-600 dark:text-zinc-400">
-                {activeCategoryName ? `Category: ${activeCategoryName}` : "Category: —"}
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex flex-col gap-1 text-xs text-zinc-600 dark:text-zinc-400">
+                <div>
+                  {activeCategoryName ? `Category: ${activeCategoryName}` : "Category: —"}
+                </div>
+                <div
+                  className="truncate"
+                  title={active.title?.trim() ? active.title.trim() : undefined}
+                >
+                  {active.title?.trim() ? `Title: ${active.title.trim()}` : "Title: —"}
+                </div>
               </div>
-              <div className="font-mono text-sm text-zinc-900 dark:text-zinc-50">
+              <div className="shrink-0 font-mono text-sm text-zinc-900 dark:text-zinc-50">
                 {formatDuration(elapsedSeconds)}
               </div>
             </div>
