@@ -23,6 +23,8 @@ type ImportV1 = {
     startedAt?: string | null;
     endedAt?: string | null;
     durationSeconds: number;
+    timeZone: string;
+    timeZoneOffsetMinutes?: number | null;
   }>;
 };
 
@@ -30,10 +32,7 @@ type ImportV2 = {
   version: 2;
   exportedAt?: string;
   categories: ImportV1["categories"];
-  sessions: Array<ImportV1["sessions"][number] & {
-    timeZone: string;
-    timeZoneOffsetMinutes?: number | null;
-  }>;
+  sessions: ImportV1["sessions"];
 };
 
 type ImportPayload = ImportV1 | ImportV2;
@@ -201,15 +200,11 @@ function parseImportPayload(
       ...(note !== undefined ? { note } : {}),
     } as const;
 
-    if (version === 2) {
-      sessions.push({
-        ...base,
-        timeZone,
-        ...(timeZoneOffsetMinutes !== undefined ? { timeZoneOffsetMinutes } : {}),
-      });
-    } else {
-      sessions.push(base);
-    }
+    sessions.push({
+      ...base,
+      timeZone,
+      ...(timeZoneOffsetMinutes !== undefined ? { timeZoneOffsetMinutes } : {}),
+    });
   }
 
   return {

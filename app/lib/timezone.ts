@@ -39,6 +39,16 @@ export function formatYmdInTimeZone(value: Date | string, timeZone: string): str
   return `${y}-${m}-${day}`;
 }
 
+// Format a Date as HH:MM (24-hour, for HTML time inputs) in the given timezone.
+export function format24hHmInTimeZone(value: Date | string, timeZone: string): string {
+  const d = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(d.getTime())) return "00:00";
+  const parts = getZonedParts(d, timeZone);
+  const h = `${parts.hour}`.padStart(2, "0");
+  const m = `${parts.minute}`.padStart(2, "0");
+  return `${h}:${m}`;
+}
+
 // Format a Date as HH:MM in the provided timezone.
 export function formatHmInTimeZone(value: Date | string, timeZone: string): string {
   const d = typeof value === "string" ? new Date(value) : value;

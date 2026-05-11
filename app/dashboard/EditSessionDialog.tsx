@@ -4,18 +4,39 @@ import type { FormEvent } from "react";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { CategoryModel, SessionModel } from "@/app/generated/prisma/models";
-import { formatYmdInTimeZone, ymdToUtcNoonIsoInTimeZone } from "@/app/lib/timezone";
+import {
+  format24hHmInTimeZone,
+  formatYmdInTimeZone,
+  ymdAndHmToUtcIsoInTimeZone,
+} from "@/app/lib/timezone";
 
 type SessionWithCategory = SessionModel & { category: CategoryModel };
 
-// Update a session by id.
+// Build default date and start/end wall times in the session timezone for the form.
+function buildEditFormTimes(session: SessionWithCategory) {
+  const tz = session.timeZone || "Asia/Yerevan";
+  if (session.startedAt && session.endedAt) {
+    return {
+      dateYmd: formatYmdInTimeZone(session.startedAt, tz),
+      startTime: format24hHmInTimeZone(session.startedAt, tz),
+      endTime: format24hHmInTimeZone(session.endedAt, tz),
+    };
+  }
+  const dateYmd = formatYmdInTimeZone(session.occurredAt, tz);
+  const startTime = format24hHmInTimeZone(session.occurredAt, tz);
+  const endMs = new Date(session.occurredAt).getTime() + session.durationSeconds * 1000;
+  const endTime = format24hHmInTimeZone(new Date(endMs), tz);
+  return { dateYmd, startTime, endTime };
+}
+
+// Update a session by id using start/end instants (server derives duration and occurredAt).
 async function updateSession(
   id: string,
   payload: {
     title: string | null;
     categoryId: string;
-    occurredAt: string;
-    durationSeconds: number;
+    startedAt: string;
+    endedAt: string;
     timeZone: string;
   },
 ) {
@@ -46,15 +67,14 @@ export function EditSessionDialog({
     [categories, session.categoryId],
   );
 
+  const initialTimes = useMemo(() => buildEditFormTimes(session), [session]);
+
   const [title, setTitle] = useState(session.title ?? "");
   const [categoryId, setCategoryId] = useState(defaultCategoryId);
   const [timeZone, setTimeZone] = useState(session.timeZone || "Asia/Yerevan");
-  const [dateYmd, setDateYmd] = useState(
-    formatYmdInTimeZone(new Date(session.occurredAt), timeZone),
-  );
-  const [durationMinutes, setDurationMinutes] = useState(
-    Math.max(1, Math.round(session.durationSeconds / 60)),
-  );
+  const [dateYmd, setDateYmd] = useState(initialTimes.dateYmd);
+  const [startTime, setStartTime] = useState(initialTimes.startTime);
+  const [endTime, setEndTime] = useState(initialTimes.endTime);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -62,25 +82,33 @@ export function EditSessionDialog({
     e.preventDefault();
     setError(null);
 
-    const minutes = Number.isFinite(durationMinutes)
-      ? Math.trunc(durationMinutes)
-      : 0;
     if (!categoryId) return setError("Category is required.");
-    if (!minutes || minutes <= 0) return setError("Duration must be > 0 minutes.");
     if (!dateYmd) return setError("Date is required.");
     if (!timeZone.trim()) return setError("Timezone is required.");
+    if (!startTime.trim() || !endTime.trim()) {
+      return setError("Start and end time are required.");
+    }
 
-    const occurredAt = ymdToUtcNoonIsoInTimeZone(dateYmd, timeZone.trim());
-    if (!occurredAt) return setError("Invalid date or timezone.");
+    const tz = timeZone.trim();
+    const startIso = ymdAndHmToUtcIsoInTimeZone(dateYmd, startTime.trim(), tz);
+    let endIso = ymdAndHmToUtcIsoInTimeZone(dateYmd, endTime.trim(), tz);
+    if (!startIso || !endIso) return setError("Invalid date, time, or timezone.");
+
+    let endMs = new Date(endIso).getTime();
+    const startMs = new Date(startIso).getTime();
+    if (endMs <= startMs) {
+      endMs += 24 * 60 * 60 * 1000;
+    }
+    const endedAtIso = new Date(endMs).toISOString();
 
     try {
       setIsSaving(true);
       await updateSession(session.id, {
         title: title.trim() ? title.trim() : null,
         categoryId,
-        occurredAt,
-        durationSeconds: minutes * 60,
-        timeZone: timeZone.trim(),
+        startedAt: startIso,
+        endedAt: endedAtIso,
+        timeZone: tz,
       });
       router.refresh();
       onClose();
@@ -135,6 +163,34 @@ export function EditSessionDialog({
             />
           </div>
 
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                Start
+              </label>
+              <input
+                type="time"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+                className="h-10 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:ring-2 focus:ring-zinc-400 dark:border-zinc-800 dark:bg-black dark:text-zinc-50"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                End
+              </label>
+              <input
+                type="time"
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+                className="h-10 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:ring-2 focus:ring-zinc-400 dark:border-zinc-800 dark:bg-black dark:text-zinc-50"
+              />
+            </div>
+          </div>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            If end is earlier than start on the clock, the end is treated as the next day.
+          </p>
+
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
               Timezone
@@ -164,20 +220,6 @@ export function EditSessionDialog({
             </select>
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-              Duration (minutes)
-            </label>
-            <input
-              type="number"
-              min={1}
-              step={1}
-              value={durationMinutes}
-              onChange={(e) => setDurationMinutes(Number(e.target.value))}
-              className="h-10 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:ring-2 focus:ring-zinc-400 dark:border-zinc-800 dark:bg-black dark:text-zinc-50"
-            />
-          </div>
-
           {error ? (
             <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
               {error}
@@ -198,4 +240,3 @@ export function EditSessionDialog({
     </div>
   );
 }
-

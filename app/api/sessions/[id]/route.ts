@@ -76,14 +76,37 @@ export async function PATCH(
     "durationSeconds" in body && typeof body.durationSeconds === "number"
       ? Math.trunc(body.durationSeconds)
       : undefined;
+  const startedAtInBody = "startedAt" in body;
+  const endedAtInBody = "endedAt" in body;
+  const startedAtParsed =
+    startedAtInBody && typeof body.startedAt === "string"
+      ? parseDate(body.startedAt)
+      : null;
+  const endedAtParsed =
+    endedAtInBody && typeof body.endedAt === "string"
+      ? parseDate(body.endedAt)
+      : null;
   const timeZoneRaw =
     "timeZone" in body && typeof body.timeZone === "string" ? body.timeZone.trim() : undefined;
 
-  if (durationSeconds !== undefined && (!durationSeconds || durationSeconds <= 0)) {
-    return jsonError("`durationSeconds` must be > 0.");
+  if (startedAtInBody !== endedAtInBody) {
+    return jsonError("Provide both `startedAt` and `endedAt`, or neither.");
   }
-  if (occurredAt !== undefined && !occurredAt) {
-    return jsonError("`occurredAt` must be a valid ISO date.");
+  const useRange = startedAtInBody && endedAtInBody;
+  if (useRange) {
+    if (!startedAtParsed || !endedAtParsed) {
+      return jsonError("`startedAt` and `endedAt` must be valid ISO dates.");
+    }
+    if (endedAtParsed.getTime() <= startedAtParsed.getTime()) {
+      return jsonError("`endedAt` must be after `startedAt`.");
+    }
+  } else {
+    if (durationSeconds !== undefined && (!durationSeconds || durationSeconds <= 0)) {
+      return jsonError("`durationSeconds` must be > 0.");
+    }
+    if (occurredAt !== undefined && !occurredAt) {
+      return jsonError("`occurredAt` must be a valid ISO date.");
+    }
   }
   if (timeZoneRaw !== undefined && timeZoneRaw && !isValidIanaTimeZone(timeZoneRaw)) {
     return jsonError("`timeZone` must be a valid IANA timezone (e.g. \"Asia/Yerevan\").");
@@ -95,18 +118,39 @@ export async function PATCH(
   }
 
   try {
-    const current =
-      occurredAt !== undefined || timeZoneRaw !== undefined
-        ? await prisma.session.findUnique({ where: { id }, select: { occurredAt: true, timeZone: true } })
-        : null;
+    const existing = await prisma.session.findUnique({ where: { id } });
+    if (!existing) return jsonError("Session not found.", 404);
 
     const nextTimeZone =
       timeZoneRaw !== undefined
         ? timeZoneRaw || (await getDefaultTimeZone())
-        : current?.timeZone;
-    const nextOccurredAt = occurredAt !== undefined ? occurredAt : current?.occurredAt;
-    const timeZoneOffsetMinutes =
-      nextTimeZone && nextOccurredAt ? offsetMinutesAt(nextOccurredAt, nextTimeZone) : undefined;
+        : existing.timeZone;
+
+    let nextOccurredAt = existing.occurredAt;
+    let nextDurationSeconds = existing.durationSeconds;
+    let nextStartedAt = existing.startedAt;
+    let nextEndedAt = existing.endedAt;
+
+    if (useRange && startedAtParsed && endedAtParsed) {
+      nextOccurredAt = startedAtParsed;
+      nextDurationSeconds = Math.floor(
+        (endedAtParsed.getTime() - startedAtParsed.getTime()) / 1000,
+      );
+      if (!nextDurationSeconds) {
+        return jsonError("Session length must be at least 1 second.");
+      }
+      nextStartedAt = startedAtParsed;
+      nextEndedAt = endedAtParsed;
+    } else {
+      if (occurredAt) nextOccurredAt = occurredAt;
+      if (durationSeconds !== undefined) nextDurationSeconds = durationSeconds;
+    }
+
+    const shouldRefreshOffset =
+      useRange || occurredAt !== undefined || timeZoneRaw !== undefined;
+    const timeZoneOffsetMinutes = shouldRefreshOffset
+      ? offsetMinutesAt(nextOccurredAt, nextTimeZone)
+      : undefined;
 
     const updated = await prisma.session.update({
       where: { id },
@@ -114,10 +158,11 @@ export async function PATCH(
         ...(title !== undefined ? { title: title || null } : {}),
         ...(note !== undefined ? { note: note || null } : {}),
         ...(categoryId !== undefined ? { categoryId } : {}),
-        ...(occurredAt !== undefined ? { occurredAt } : {}),
-        ...(durationSeconds !== undefined ? { durationSeconds } : {}),
-        ...(timeZoneRaw !== undefined ? { timeZone: timeZoneRaw || (await getDefaultTimeZone()) } : {}),
-        ...(timeZoneOffsetMinutes !== undefined ? { timeZoneOffsetMinutes } : {}),
+        ...(useRange || occurredAt !== undefined ? { occurredAt: nextOccurredAt } : {}),
+        ...(useRange || durationSeconds !== undefined ? { durationSeconds: nextDurationSeconds } : {}),
+        ...(useRange ? { startedAt: nextStartedAt, endedAt: nextEndedAt } : {}),
+        ...(timeZoneRaw !== undefined ? { timeZone: nextTimeZone } : {}),
+        ...(shouldRefreshOffset ? { timeZoneOffsetMinutes } : {}),
       },
       include: { category: true },
     });
