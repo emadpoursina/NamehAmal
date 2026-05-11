@@ -138,7 +138,7 @@ Main working page:
 ### 4. Analytics (`/stats`)
 - Time spent per category
 - Filter by:
-  - **week preset** (Monday–Sunday, local time) or arbitrary date range
+  - **range preset** (today, yesterday, this week, last week — weeks are Monday–Sunday in the default timezone) or arbitrary date range
   - date range (`from` / `to`)
   - category
 - **Weekly goals**: when the range is exactly one local Monday-through-Sunday week, compare tracked time per category to **weekly hour targets** set in Settings (categories with no target are omitted from the goals table).
@@ -146,7 +146,7 @@ Main working page:
 
 Implementation notes:
 - Stats uses session `occurredAt` for date-range filtering and `durationSeconds` for totals.
-- Default stats range when `from` / `to` are missing or invalid: **current calendar week** (local Monday 00:00 through Sunday end of day), matching the week preset control.
+- Default stats range when `from` / `to` are missing or invalid: **current calendar week** (local Monday 00:00 through Sunday end of day), matching the “This week” preset.
 - Proposed query params:
   - `from`: `YYYY-MM-DD` (local date)
   - `to`: `YYYY-MM-DD` (local date)

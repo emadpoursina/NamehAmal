@@ -60,7 +60,7 @@ This project exposes minimal server endpoints (create + list) for **categories**
 
 ## Stats filters
 
-The Stats page at `/stats` uses `from`, `to` (`YYYY-MM-DD` in your configured **default timezone**), and optional `categoryId`. If `from` / `to` are missing or invalid, the range defaults to the **current week** (Monday through Sunday) in the default timezone. A week dropdown sets `from` and `to` accordingly.
+The Stats page at `/stats` uses `from`, `to` (`YYYY-MM-DD` in your configured **default timezone**), and optional `categoryId`. If `from` / `to` are missing or invalid, the range defaults to the **current week** (Monday through Sunday) in the default timezone. A **Range** dropdown sets quick presets: **Today**, **Yesterday**, **This week**, **Last week**; otherwise use the date inputs for a custom range.
 
 ## Dashboard filters
 
@@ -106,8 +106,8 @@ Timezone notes:
 - You can configure the **default timezone** in Settings; new sessions will use it unless you override the timezone in the session form/tracker.
 
 Creating a **manual** session:
-- Either send `startedAt` and `endedAt` (ISO timestamps): duration is derived and `occurredAt` is set to `startedAt`.
-- Or send `occurredAt` and `durationSeconds` (legacy): no start/end times stored unless you also pass `startedAt` / `endedAt`.
+- **Create (POST)** or **update (PATCH)** with `startedAt` and `endedAt` (ISO timestamps): duration is derived and `occurredAt` is set to `startedAt`. For PATCH, send both fields together.
+- Or send `occurredAt` and `durationSeconds` (legacy): no start/end times updated unless you also pass `startedAt` / `endedAt`.
 
 Example:
 
@@ -127,7 +127,12 @@ curl -sS -X POST "http://localhost:3000/api/sessions" \
 
 curl -sS -X PATCH "http://localhost:3000/api/sessions/<session-id>" \
   -H "content-type: application/json" \
-  -d '{"title":"Updated title","durationSeconds":1800}' | jq
+  -d '{
+    "title":"Updated title",
+    "timeZone":"Asia/Yerevan",
+    "startedAt":"2026-01-01T09:00:00.000Z",
+    "endedAt":"2026-01-01T10:00:00.000Z"
+  }' | jq
 
 curl -sS -X DELETE "http://localhost:3000/api/sessions/<session-id>" | jq
 ```
