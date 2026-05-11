@@ -1,12 +1,9 @@
-// Format a duration in seconds as hh:mm or mm:ss.
+// Format a duration in seconds as HH:MM (no seconds; sub-hour uses 00 for hours).
 export function formatDuration(seconds: number) {
   const total = Number.isFinite(seconds) ? Math.max(0, Math.trunc(seconds)) : 0;
   const hours = Math.floor(total / 3600);
   const minutes = Math.floor((total % 3600) / 60);
-  const secs = total % 60;
-
-  if (hours > 0) return `${hours}:${`${minutes}`.padStart(2, "0")}`;
-  return `${minutes}:${`${secs}`.padStart(2, "0")}`;
+  return `${`${hours}`.padStart(2, "0")}:${`${minutes}`.padStart(2, "0")}`;
 }
 
 // Format a Date into a local time string (HH:MM).
