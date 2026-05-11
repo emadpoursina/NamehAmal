@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { CategoryModel, SessionModel } from "@/app/generated/prisma/models";
+import { emitActiveTimerRefresh } from "@/app/dashboard/active-timer-refresh-bus";
 import { formatDuration } from "@/app/dashboard/format";
 import { EditSessionDialog } from "@/app/dashboard/EditSessionDialog";
 import { formatHmInTimeZone, formatYmdInTimeZone } from "@/app/lib/timezone";
@@ -124,6 +125,7 @@ export function SessionsTable({
                           title: s.title?.trim() ? s.title.trim() : null,
                           timeZone: s.timeZone || "Asia/Yerevan",
                         });
+                        emitActiveTimerRefresh();
                         router.refresh();
                       } catch (err) {
                         alert(

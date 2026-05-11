@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { CategoryModel, SessionModel } from "@/app/generated/prisma/models";
+import { subscribeActiveTimerRefresh } from "@/app/dashboard/active-timer-refresh-bus";
 import { formatDuration } from "@/app/dashboard/format";
 
 type SessionWithCategory = SessionModel & { category: CategoryModel };
@@ -82,18 +83,23 @@ export function TrackerCard({ categories }: { categories: CategoryModel[] }) {
 
   useEffect(() => {
     let cancelled = false;
-    fetchActiveTimer()
-      .then((s) => {
-        if (!cancelled) {
-          setError(null);
-          setActive(s);
-        }
-      })
-      .catch((e) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load timer.");
-      });
+    const load = () => {
+      fetchActiveTimer()
+        .then((s) => {
+          if (!cancelled) {
+            setError(null);
+            setActive(s);
+          }
+        })
+        .catch((e) => {
+          if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load timer.");
+        });
+    };
+    load();
+    const unsub = subscribeActiveTimerRefresh(load);
     return () => {
       cancelled = true;
+      unsub();
     };
   }, []);
 
