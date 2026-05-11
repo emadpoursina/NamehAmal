@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { CategoryModel } from "@/app/generated/prisma/models";
 import {
-  buildWeekPresetOptionsInTimeZone,
+  buildStatsRangePresetOptionsInTimeZone,
   matchingWeekPresetValue,
 } from "@/app/lib/local-week";
 
@@ -33,7 +33,7 @@ function useStatsFilterNavigation() {
   }, [pathname, router, searchParams]);
 }
 
-// Render week preset, date range, and category filters.
+// Render range preset, date range, and category filters.
 export function StatsFilters({
   categories,
   activeFrom,
@@ -48,10 +48,13 @@ export function StatsFilters({
   timeZone: string;
 }) {
   const navigate = useStatsFilterNavigation();
-  const weekPresets = useMemo(() => buildWeekPresetOptionsInTimeZone(timeZone, 12), [timeZone]);
-  const weekSelectValue = useMemo(
-    () => matchingWeekPresetValue(activeFrom, activeTo, weekPresets),
-    [activeFrom, activeTo, weekPresets],
+  const rangePresets = useMemo(
+    () => buildStatsRangePresetOptionsInTimeZone(timeZone),
+    [timeZone],
+  );
+  const rangeSelectValue = useMemo(
+    () => matchingWeekPresetValue(activeFrom, activeTo, rangePresets),
+    [activeFrom, activeTo, rangePresets],
   );
   const categoriesForPicker = useMemo(
     () => categories.filter((c) => !c.isArchived),
@@ -62,23 +65,23 @@ export function StatsFilters({
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-1.5">
         <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-          Week
+          Range
         </label>
         <select
-          value={weekSelectValue || "custom"}
+          value={rangeSelectValue || "custom"}
           onChange={(e) => {
             const v = e.target.value;
             if (v === "custom") return;
-            const preset = weekPresets.find((p) => p.value === v);
+            const preset = rangePresets.find((p) => p.value === v);
             if (!preset) return;
             navigate({ from: preset.mondayYmd, to: preset.sundayYmd });
           }}
           className="h-10 w-full max-w-md rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:ring-2 focus:ring-zinc-400 dark:border-zinc-800 dark:bg-black dark:text-zinc-50"
         >
           <option value="custom">Custom range (use dates below)</option>
-          {weekPresets.map((p) => (
+          {rangePresets.map((p) => (
             <option key={p.value} value={p.value}>
-              {p.label} ({p.mondayYmd} – {p.sundayYmd})
+              {`${p.label} (${p.mondayYmd === p.sundayYmd ? p.mondayYmd : `${p.mondayYmd} – ${p.sundayYmd}`})`}
             </option>
           ))}
         </select>

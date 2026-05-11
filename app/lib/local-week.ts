@@ -158,6 +158,24 @@ export function buildWeekPresetOptionsInTimeZone(
   return out;
 }
 
+/** Stats range presets: today, yesterday, this week, last week (calendar in `timeZone`). */
+export function buildStatsRangePresetOptionsInTimeZone(timeZone: string): WeekPresetOption[] {
+  const now = new Date();
+  const todayYmd = formatYmdInTimeZone(now, timeZone);
+  const yesterdayYmd = addDaysToYmdUtc(todayYmd, -1) ?? todayYmd;
+  const thisMondayYmd = startOfWeekMondayYmdInTimeZone(timeZone, now);
+  const thisSundayYmd = addDaysToYmdUtc(thisMondayYmd, 6)!;
+  const lastMondayYmd = addDaysToYmdUtc(thisMondayYmd, -7) ?? thisMondayYmd;
+  const lastSundayYmd = addDaysToYmdUtc(lastMondayYmd, 6)!;
+
+  return [
+    { value: "today", label: "Today", mondayYmd: todayYmd, sundayYmd: todayYmd },
+    { value: "yesterday", label: "Yesterday", mondayYmd: yesterdayYmd, sundayYmd: yesterdayYmd },
+    { value: "past-0", label: "This week", mondayYmd: thisMondayYmd, sundayYmd: thisSundayYmd },
+    { value: "past-1", label: "Last week", mondayYmd: lastMondayYmd, sundayYmd: lastSundayYmd },
+  ];
+}
+
 /** Build select options: next week, this week, last week, …, N weeks ago (local Monday weeks). */
 export function buildWeekPresetOptions(numPastWeeks: number): WeekPresetOption[] {
   const thisMonday = startOfWeekMondayLocal(new Date());
