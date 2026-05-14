@@ -139,6 +139,18 @@ export function ymdToUtcNoonIsoInTimeZone(ymd: string, timeZone: string): string
   return new Date(ms).toISOString();
 }
 
+// Shift a YYYY-MM-DD calendar label by whole days in the given IANA timezone (noon anchor avoids DST edge cases).
+export function addCalendarDaysToYmdInTimeZone(
+  ymd: string,
+  deltaDays: number,
+  timeZone: string,
+): string | null {
+  const noonIso = ymdToUtcNoonIsoInTimeZone(ymd, timeZone);
+  if (!noonIso) return null;
+  const shifted = new Date(new Date(noonIso).getTime() + deltaDays * 86_400_000);
+  return formatYmdInTimeZone(shifted, timeZone);
+}
+
 // Compute the UTC offset (in minutes) for a timezone at a given instant.
 export function offsetMinutesAt(date: Date, timeZone: string): number | null {
   if (Number.isNaN(date.getTime())) return null;
