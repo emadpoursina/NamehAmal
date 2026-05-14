@@ -79,7 +79,7 @@ Rules:
 2. Sees list of sessions (default: today)
 3. Can:
    - filter by category
-   - filter by date
+   - filter by date (picker or previous/next day buttons, one calendar day at a time in the default timezone)
 4. Reviews all sessions in a simple table
 
 ---
