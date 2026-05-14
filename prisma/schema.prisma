@@ -27,7 +27,8 @@ model Category {
   /// Planned hours per Monday–Sunday week (null = no weekly target).
   weeklyTargetHours Float?
 
-  sessions  Session[]
+  sessions     Session[]
+  activeTimers ActiveTimer[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -73,6 +74,24 @@ model Session {
   @@index([categoryId, occurredAt])
   @@index([startedAt])
   @@index([endedAt])
+}
+
+/// In-progress live timer (not a finalized Session row until stop).
+model ActiveTimer {
+  id        String   @id @default(cuid())
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  title     String?
+  timeZone  String
+  startedAt DateTime
+
+  timeZoneOffsetMinutes Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([categoryId])
 }
 
 model AppSettings {

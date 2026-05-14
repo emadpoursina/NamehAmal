@@ -30,6 +30,7 @@ async function main() {
     });
 
     await prisma.session.deleteMany();
+    await prisma.activeTimer.deleteMany();
     await prisma.category.deleteMany();
 
     const categories = await prisma.category.createMany({
