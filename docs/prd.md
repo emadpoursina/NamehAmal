@@ -57,11 +57,12 @@ Existing tools are often:
 ---
 
 #### B. Live Tracking
-1. User selects a category (and optionally title)
-2. Clicks "Start"
-3. Timer runs
-4. User clicks "Stop"
-5. Session is saved automatically
+1. User selects a category (and optionally title and timezone)
+2. Optionally sets a **start time** (wall clock on the selected dashboard date, in the chosen timezone) so elapsed time counts from that moment instead of “now”
+3. Clicks "Start"
+4. Timer runs
+5. User clicks "Stop"
+6. Session is saved automatically
 
 Rules:
 - Only **one** live timer session can run at a time.

@@ -143,7 +143,7 @@ curl -sS -X DELETE "http://localhost:3000/api/sessions/<session-id>" | jq
 ### Live tracker
 
 - **Status**: `GET /api/tracker` — returns a session-shaped JSON object for the running draft (or `null`).
-- **Start**: `POST /api/tracker` with `{ "action": "start", "categoryId", "title"?, "timeZone"? }` — creates an `ActiveTimer` draft (no `Session` row yet).
+- **Start**: `POST /api/tracker` with `{ "action": "start", "categoryId", "title"?, "timeZone"?, "startedAt"? }` — creates an `ActiveTimer` draft (no `Session` row yet). Optional `startedAt` (ISO) must not be in the future; omit it to use the request time as the recording start.
 - **Stop**: `POST /api/tracker` with `{ "action": "stop", "sessionId" }` — `sessionId` is the id returned from start; the server creates the `Session` and deletes the draft.
 
 ## Common tasks
