@@ -65,7 +65,8 @@ Existing tools are often:
 
 Rules:
 - Only **one** live timer session can run at a time.
-- A live timer session is considered **running** when `kind = TIMER` and `endedAt = null`.
+- While running, the timer is stored as an **ActiveTimer** draft; a **Session** row is created only when the user stops the timer (finalized `TIMER` with `endedAt` set). The dashboard session table lists finalized sessions only.
+- Older builds may still have an in-flight `Session` row (`kind = TIMER`, `endedAt = null`); the stop endpoint still finalizes those, and list/export omit them until stopped.
 - On stop, `durationSeconds` is computed as `max(1, floor((endedAt - startedAt) / 1000))`.
 
 ---

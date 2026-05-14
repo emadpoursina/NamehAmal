@@ -71,6 +71,8 @@ The Dashboard lives at `/` and stores filters in the URL so they are shareable a
 
 Sessions in the table include a **Record again** action that starts a new live timer with the same category and title. The tracker card refetches the active session when that happens (`app/dashboard/active-timer-refresh-bus.ts`), because `router.refresh()` does not remount client components that keep their own timer state.
 
+While a live timer is running, it is **not** listed in the sessions table: the server keeps an `ActiveTimer` draft until you click **Stop**, then it inserts a finalized `Session` row (`kind: TIMER` with `endedAt` set).
+
 These filters are translated into `/api/sessions` query params:
 
 - `occurredFrom` = selected day at `00:00:00.000` (default timezone, sent as ISO)
@@ -97,6 +99,7 @@ curl -sS -X POST "http://localhost:3000/api/categories" \
 
 - **List**: `GET /api/sessions`
   - Optional filters: `categoryId`, `occurredFrom`, `occurredTo`, `limit`
+  - In-progress `TIMER` sessions (`endedAt` null) are excluded so the table only shows finalized work blocks.
 - **Create**: `POST /api/sessions`
 - **Update**: `PATCH /api/sessions/:id`
 - **Delete**: `DELETE /api/sessions/:id`
@@ -136,6 +139,12 @@ curl -sS -X PATCH "http://localhost:3000/api/sessions/<session-id>" \
 
 curl -sS -X DELETE "http://localhost:3000/api/sessions/<session-id>" | jq
 ```
+
+### Live tracker
+
+- **Status**: `GET /api/tracker` — returns a session-shaped JSON object for the running draft (or `null`).
+- **Start**: `POST /api/tracker` with `{ "action": "start", "categoryId", "title"?, "timeZone"? }` — creates an `ActiveTimer` draft (no `Session` row yet).
+- **Stop**: `POST /api/tracker` with `{ "action": "stop", "sessionId" }` — `sessionId` is the id returned from start; the server creates the `Session` and deletes the draft.
 
 ## Common tasks
 
