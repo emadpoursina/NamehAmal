@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { CategoryModel, SessionModel } from "@/app/generated/prisma/models";
 import { subscribeActiveTimerRefresh } from "@/app/dashboard/active-timer-refresh-bus";
 import { formatDuration } from "@/app/dashboard/format";
+import { ymdAndHmToUtcIsoInTimeZone } from "@/app/lib/timezone";
 
 type SessionWithCategory = SessionModel & { category: CategoryModel };
 
@@ -36,8 +37,13 @@ async function fetchDefaultTimeZone(): Promise<string> {
   return json.data.timeZone || "Asia/Yerevan";
 }
 
-// Start a new timer session.
-async function startTimer(payload: { categoryId: string; title: string | null; timeZone: string }) {
+// Start a new timer session (optional `startedAt` ISO for backdated start).
+async function startTimer(payload: {
+  categoryId: string;
+  title: string | null;
+  timeZone: string;
+  startedAt?: string;
+}) {
   const res = await fetch("/api/tracker", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -68,13 +74,20 @@ async function stopTimer(sessionId: string) {
 }
 
 // Render the live tracking card (start/stop + elapsed time).
-export function TrackerCard({ categories }: { categories: CategoryModel[] }) {
+export function TrackerCard({
+  categories,
+  activeDate,
+}: {
+  categories: CategoryModel[];
+  activeDate: string;
+}) {
   const router = useRouter();
   const defaultCategoryId = useMemo(() => categories[0]?.id ?? "", [categories]);
 
   const [active, setActive] = useState<SessionWithCategory | null>(null);
   const [categoryId, setCategoryId] = useState(defaultCategoryId);
   const [title, setTitle] = useState("");
+  const [startTime, setStartTime] = useState("");
   const [timeZone, setTimeZone] = useState("Asia/Yerevan");
   const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -138,15 +151,32 @@ export function TrackerCard({ categories }: { categories: CategoryModel[] }) {
     if (!categoryId) return setError("Category is required.");
     if (!categories.length) return setError("No categories available.");
     if (!timeZone.trim()) return setError("Timezone is required.");
+    const tz = timeZone.trim();
+    let startedAtIso: string | undefined;
+    if (startTime.trim()) {
+      const iso = ymdAndHmToUtcIsoInTimeZone(activeDate, startTime.trim(), tz);
+      if (!iso) {
+        setError("Invalid start time, date, or timezone.");
+        return;
+      }
+      if (new Date(iso).getTime() > Date.now() + 60_000) {
+        setError("Start time cannot be in the future.");
+        return;
+      }
+      startedAtIso = iso;
+    }
+
     try {
       setIsBusy(true);
       const created = await startTimer({
         categoryId,
         title: title.trim() ? title.trim() : null,
-        timeZone: timeZone.trim(),
+        timeZone: tz,
+        ...(startedAtIso ? { startedAt: startedAtIso } : {}),
       });
       setActive(created);
       setTitle("");
+      setStartTime("");
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to start timer.");
@@ -258,6 +288,21 @@ export function TrackerCard({ categories }: { categories: CategoryModel[] }) {
                 placeholder='e.g. "Asia/Yerevan"'
                 className="h-10 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:ring-2 focus:ring-zinc-400 dark:border-zinc-800 dark:bg-black dark:text-zinc-50"
               />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                Start time (optional)
+              </label>
+              <input
+                type="time"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+                className="h-10 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:ring-2 focus:ring-zinc-400 dark:border-zinc-800 dark:bg-black dark:text-zinc-50"
+              />
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                Wall time on {activeDate} in the timezone above; leave empty to start from now.
+              </p>
             </div>
 
             {error ? (

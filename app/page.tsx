@@ -88,7 +88,7 @@ export default async function DashboardPage({
         />
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-6">
           <AddSessionForm categories={categories} activeDate={activeDate} />
-          <TrackerCard categories={categories} />
+          <TrackerCard categories={categories} activeDate={activeDate} />
           <div className="text-xs text-zinc-500 dark:text-zinc-400 sm:ml-auto">
             {/* Inform user about the number of sessions */}
             Showing {sessions.length} session(s)

@@ -19,6 +19,13 @@ async function readJson(request: Request): Promise<unknown> {
   }
 }
 
+// Parse an ISO date string safely.
+function parseDate(value: string | null) {
+  if (!value) return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 // Fetch a legacy in-flight TIMER Session row (older app versions).
 async function getLegacyActiveTimerSession() {
   return prisma.session.findFirst({
@@ -108,7 +115,21 @@ export async function POST(request: Request) {
       );
     }
 
-    const startedAt = new Date();
+    const startedAtRaw =
+      "startedAt" in body && typeof body.startedAt === "string" ? body.startedAt.trim() : "";
+    const nowMs = Date.now();
+    const futureSlackMs = 60_000;
+
+    let startedAt = new Date();
+    if (startedAtRaw) {
+      const parsed = parseDate(startedAtRaw);
+      if (!parsed) return jsonError("`startedAt` must be a valid ISO date.");
+      if (parsed.getTime() > nowMs + futureSlackMs) {
+        return jsonError("`startedAt` cannot be in the future.");
+      }
+      startedAt = parsed;
+    }
+
     const timeZoneOffsetMinutes = offsetMinutesAt(startedAt, timeZone);
 
     try {
