@@ -85,6 +85,7 @@ export default async function DashboardPage({
           categories={categories}
           activeDate={activeDate}
           activeCategoryId={categoryId || null}
+          defaultTimeZone={defaultTimeZone}
         />
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-6">
           <AddSessionForm categories={categories} activeDate={activeDate} />
