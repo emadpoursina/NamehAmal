@@ -19,8 +19,8 @@ async function readJson(request: Request): Promise<unknown> {
   }
 }
 
-// Fetch the currently running timer session, if any.
-async function getActiveTimerSession() {
+// Fetch a legacy in-flight TIMER Session row (older app versions).
+async function getLegacyActiveTimerSession() {
   return prisma.session.findFirst({
     where: { kind: "TIMER", endedAt: null },
     orderBy: [{ startedAt: "desc" }, { createdAt: "desc" }],
@@ -28,9 +28,46 @@ async function getActiveTimerSession() {
   });
 }
 
+// Fetch the draft live timer row (not listed in Session until stop).
+async function getDraftActiveTimer() {
+  return prisma.activeTimer.findFirst({
+    orderBy: [{ createdAt: "desc" }],
+    include: { category: true },
+  });
+}
+
+// Map an ActiveTimer row to the Session-shaped JSON the tracker UI expects.
+function draftActiveTimerToSessionShape(
+  draft: Prisma.ActiveTimerGetPayload<{ include: { category: true } }>,
+) {
+  return {
+    id: draft.id,
+    kind: "TIMER" as const,
+    title: draft.title,
+    note: null as string | null,
+    categoryId: draft.categoryId,
+    category: draft.category,
+    occurredAt: draft.startedAt,
+    startedAt: draft.startedAt,
+    endedAt: null as Date | null,
+    durationSeconds: 0,
+    timeZone: draft.timeZone,
+    timeZoneOffsetMinutes: draft.timeZoneOffsetMinutes,
+    createdAt: draft.createdAt,
+    updatedAt: draft.updatedAt,
+  };
+}
+
+// Resolve the current running timer for GET / start conflict checks (draft or legacy Session).
+async function getActiveTimerForClient() {
+  const draft = await getDraftActiveTimer();
+  if (draft) return draftActiveTimerToSessionShape(draft);
+  return getLegacyActiveTimerSession();
+}
+
 // Return the currently active timer session (or null).
 export async function GET() {
-  const active = await getActiveTimerSession();
+  const active = await getActiveTimerForClient();
   return Response.json({ ok: true, data: active ?? null });
 }
 
@@ -63,7 +100,7 @@ export async function POST(request: Request) {
       return jsonError("`timeZone` must be a valid IANA timezone (e.g. \"Asia/Yerevan\").");
     }
 
-    const existing = await getActiveTimerSession();
+    const existing = await getActiveTimerForClient();
     if (existing) {
       return Response.json(
         { ok: false, error: "A timer session is already running.", data: existing },
@@ -75,23 +112,21 @@ export async function POST(request: Request) {
     const timeZoneOffsetMinutes = offsetMinutesAt(startedAt, timeZone);
 
     try {
-      const created = await prisma.session.create({
+      const created = await prisma.activeTimer.create({
         data: {
-          kind: "TIMER",
           title: title || null,
-          note: null,
           categoryId,
-          occurredAt: startedAt,
-          startedAt,
-          endedAt: null,
-          durationSeconds: 0,
           timeZone,
+          startedAt,
           timeZoneOffsetMinutes,
         },
         include: { category: true },
       });
 
-      return Response.json({ ok: true, data: created }, { status: 201 });
+      return Response.json(
+        { ok: true, data: draftActiveTimerToSessionShape(created) },
+        { status: 201 },
+      );
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError) {
         return jsonError("Failed to start timer session.", 400);
@@ -107,6 +142,49 @@ export async function POST(request: Request) {
         : "";
 
     if (!sessionId) return jsonError("`sessionId` is required.");
+
+    const draft = await prisma.activeTimer.findUnique({
+      where: { id: sessionId },
+      include: { category: true },
+    });
+
+    if (draft) {
+      const endedAt = new Date();
+      const durationSeconds = Math.max(
+        1,
+        Math.floor((endedAt.getTime() - draft.startedAt.getTime()) / 1000),
+      );
+
+      try {
+        const finalized = await prisma.$transaction(async (tx) => {
+          const created = await tx.session.create({
+            data: {
+              kind: "TIMER",
+              title: draft.title,
+              note: null,
+              categoryId: draft.categoryId,
+              occurredAt: draft.startedAt,
+              startedAt: draft.startedAt,
+              endedAt,
+              durationSeconds,
+              timeZone: draft.timeZone,
+              timeZoneOffsetMinutes: draft.timeZoneOffsetMinutes,
+            },
+            include: { category: true },
+          });
+          await tx.activeTimer.delete({ where: { id: draft.id } });
+          return created;
+        });
+
+        return Response.json({ ok: true, data: finalized });
+      } catch (err) {
+        if (err instanceof Prisma.PrismaClientKnownRequestError) {
+          if (err.code === "P2025") return jsonError("Timer session not found.", 404);
+          return jsonError("Failed to stop timer session.", 400);
+        }
+        return jsonError("Failed to stop timer session.", 500);
+      }
+    }
 
     const session = await prisma.session.findUnique({
       where: { id: sessionId },
@@ -144,4 +222,3 @@ export async function POST(request: Request) {
 
   return jsonError("Invalid `action`. Expected `start` or `stop`.");
 }
-

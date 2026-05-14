@@ -40,6 +40,9 @@ export async function GET() {
       },
     }),
     prisma.session.findMany({
+      where: {
+        NOT: { kind: "TIMER", endedAt: null },
+      },
       orderBy: [{ occurredAt: "desc" }, { createdAt: "desc" }],
       include: { category: { select: { name: true } } },
     }),

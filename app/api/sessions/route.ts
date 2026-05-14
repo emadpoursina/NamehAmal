@@ -40,6 +40,8 @@ export async function GET(request: Request) {
 
   const sessions = await prisma.session.findMany({
     where: {
+      // In-progress live timers live in ActiveTimer until stop; hide legacy open TIMER rows too.
+      NOT: { kind: "TIMER", endedAt: null },
       ...(categoryId ? { categoryId } : {}),
       ...(occurredFrom || occurredTo
         ? {
