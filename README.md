@@ -54,6 +54,14 @@ bun run dev
 
 Open `http://localhost:3000`.
 
+## Deploy behind nginx / custom domain
+
+Use a **production** build (`bun run build` then `bun run start`) and proxy the **entire** site (including `/_next/static`) to the Node process with `X-Forwarded-Proto` and `X-Forwarded-Host` set.
+
+If the page loads but **buttons and forms do nothing**, client JavaScript did not load — usually `/_next/static` is 404/403 or you are running `next dev` without allowlisting your domain. See [docs/nginx-reverse-proxy.md](docs/nginx-reverse-proxy.md).
+
+For `next dev` through a custom host, set `ALLOWED_DEV_ORIGINS` in `.env` (see `.env.example`) and restart the dev server.
+
 ## Server-side CRUD (minimal)
 
 This project exposes minimal server endpoints (create + list) for **categories** and **sessions**.
