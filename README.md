@@ -54,6 +54,14 @@ bun run dev
 
 Open `http://localhost:3000`.
 
+The default dev script uses **webpack** (`next dev --webpack`) because Turbopack can panic during HMR with `Next.js package not found`, which makes the browser reload in a loop. To try Turbopack anyway:
+
+```bash
+bun run dev:turbo
+```
+
+If the page keeps refreshing, stop the server, delete `.next`, and restart with `bun run dev` (webpack mode).
+
 ## Deploy behind nginx / custom domain
 
 Use a **production** build (`bun run build` then `bun run start`) and proxy the **entire** site (including `/_next/static`) to the Node process with `X-Forwarded-Proto` and `X-Forwarded-Host` set.
