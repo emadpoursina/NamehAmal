@@ -30,30 +30,30 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <header className="border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-black">
+        <header className="border-b border-zinc-200 bg-white transition-shadow duration-200 hover:shadow-sm dark:border-zinc-800 dark:bg-black dark:hover:shadow-zinc-900/50">
           <div className="mx-auto flex w-full max-w-5xl items-center gap-4 px-4 py-3 sm:px-6">
             <Link
               href="/"
-              className="text-sm font-semibold text-zinc-900 dark:text-zinc-50"
+              className="rounded-md px-2.5 py-1 text-sm font-semibold text-zinc-900 transition-colors duration-150 hover:bg-zinc-50 hover:text-zinc-700 dark:text-zinc-50 dark:hover:bg-zinc-950 dark:hover:text-zinc-200"
             >
               NamehAmal
             </Link>
             <nav className="ml-auto flex items-center gap-2">
               <Link
                 href="/"
-                className="rounded-md px-2.5 py-1 text-sm text-zinc-700 hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-950"
+                className="rounded-md px-2.5 py-1 text-sm text-zinc-700 transition-colors duration-150 hover:bg-zinc-50 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-950 dark:hover:text-zinc-100"
               >
                 Dashboard
               </Link>
               <Link
                 href="/settings"
-                className="rounded-md px-2.5 py-1 text-sm text-zinc-700 hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-950"
+                className="rounded-md px-2.5 py-1 text-sm text-zinc-700 transition-colors duration-150 hover:bg-zinc-50 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-950 dark:hover:text-zinc-100"
               >
                 Settings
               </Link>
               <Link
                 href="/stats"
-                className="rounded-md px-2.5 py-1 text-sm text-zinc-700 hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-950"
+                className="rounded-md px-2.5 py-1 text-sm text-zinc-700 transition-colors duration-150 hover:bg-zinc-50 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-950 dark:hover:text-zinc-100"
               >
                 Stats
               </Link>
