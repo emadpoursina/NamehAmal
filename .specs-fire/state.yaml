@@ -74,11 +74,13 @@ intents:
         completed_at: 2026-07-15T17:18:42.462Z
       - id: sessions-table-inline-create
         title: Sessions Table Inline Activity Create
-        status: pending
+        status: completed
         complexity: low
         mode: autopilot
         depends_on:
           - activity-management-ui
+        run_id: run-nameh-amal-002
+        completed_at: 2026-07-15T17:20:13.925Z
 runs:
   active: []
   completed:
@@ -105,3 +107,11 @@ runs:
           mode: confirm
       started: 2026-07-15T16:51:48.143Z
       completed: 2026-07-15T17:18:42.462Z
+    - id: run-nameh-amal-002
+      scope: single
+      work_items:
+        - id: sessions-table-inline-create
+          intent: activity-presets
+          mode: autopilot
+      started: 2026-07-15T17:19:40.916Z
+      completed: 2026-07-15T17:20:13.925Z

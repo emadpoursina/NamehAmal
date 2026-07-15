@@ -7,6 +7,7 @@ import { emitActiveTimerRefresh } from "@/app/dashboard/active-timer-refresh-bus
 import { formatDuration } from "@/app/dashboard/format";
 import { EditSessionDialog } from "@/app/dashboard/EditSessionDialog";
 import { formatHmInTimeZone, formatYmdInTimeZone } from "@/app/lib/timezone";
+import { ActivityFormDialog } from "@/app/settings/ActivityFormDialog";
 
 type SessionWithCategory = SessionModel & { category: CategoryModel };
 
@@ -44,27 +45,42 @@ export function SessionsTable({
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState<SessionWithCategory | null>(null);
+  const [createActivityOpen, setCreateActivityOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [recordingId, setRecordingId] = useState<string | null>(null);
 
-  if (!sessions.length) {
-    return (
-      <div className="rounded-xl border border-zinc-200 bg-white p-10 text-center text-sm text-zinc-600 dark:border-zinc-800 dark:bg-black dark:text-zinc-400">
-        No sessions found for this filter.
-      </div>
-    );
-  }
+  const activeCategories = categories.filter((c) => !c.isArchived);
 
   return (
-    <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-black">
-      {editing ? (
-        <EditSessionDialog
-          session={editing}
-          categories={categories}
-          onClose={() => setEditing(null)}
-        />
-      ) : null}
-      <table className="w-full border-collapse text-sm">
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+          Sessions
+        </div>
+        <button
+          type="button"
+          onClick={() => setCreateActivityOpen(true)}
+          disabled={!activeCategories.length}
+          className="inline-flex h-9 items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 text-xs font-medium text-zinc-800 hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-800 dark:bg-black dark:text-zinc-200 dark:hover:bg-zinc-950"
+        >
+          New activity
+        </button>
+      </div>
+
+      {!sessions.length ? (
+        <div className="rounded-xl border border-zinc-200 bg-white p-10 text-center text-sm text-zinc-600 dark:border-zinc-800 dark:bg-black dark:text-zinc-400">
+          No sessions found for this filter.
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-black">
+          {editing ? (
+            <EditSessionDialog
+              session={editing}
+              categories={categories}
+              onClose={() => setEditing(null)}
+            />
+          ) : null}
+          <table className="w-full border-collapse text-sm">
         <thead className="bg-zinc-50 text-left text-xs font-medium text-zinc-600 dark:bg-zinc-950 dark:text-zinc-400">
           <tr>
             <th className="px-4 py-3">Date</th>
@@ -174,6 +190,15 @@ export function SessionsTable({
           ))}
         </tbody>
       </table>
+        </div>
+      )}
+
+      <ActivityFormDialog
+        open={createActivityOpen}
+        onClose={() => setCreateActivityOpen(false)}
+        categories={categories}
+        onSuccess={() => router.refresh()}
+      />
     </div>
   );
 }
