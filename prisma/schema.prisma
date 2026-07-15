@@ -29,11 +29,29 @@ model Category {
 
   sessions     Session[]
   activeTimers ActiveTimer[]
+  activities   Activity[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
   @@index([isArchived, sortOrder])
+}
+
+model Activity {
+  id                     String   @id @default(cuid())
+  title                  String   @unique
+  categoryId             String
+  category               Category @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  defaultDurationSeconds Int?
+  color                  String?
+  sortOrder              Int      @default(0)
+  isPinned               Boolean  @default(false)
+  isArchived             Boolean  @default(false)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@index([isArchived, sortOrder])
+  @@index([categoryId])
 }
 
 model Session {

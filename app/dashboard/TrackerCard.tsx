@@ -3,9 +3,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { CategoryModel, SessionModel } from "@/app/generated/prisma/models";
+import { ActivityCombobox, type ActivitySelection } from "@/app/components/ActivityCombobox";
 import { subscribeActiveTimerRefresh } from "@/app/dashboard/active-timer-refresh-bus";
 import { formatDuration } from "@/app/dashboard/format";
+import { toActivitySelection } from "@/app/lib/use-activities";
 import { ymdAndHmToUtcIsoInTimeZone } from "@/app/lib/timezone";
+import { ActivityFormDialog } from "@/app/settings/ActivityFormDialog";
 
 type SessionWithCategory = SessionModel & { category: CategoryModel };
 
@@ -87,6 +90,8 @@ export function TrackerCard({
   const [active, setActive] = useState<SessionWithCategory | null>(null);
   const [categoryId, setCategoryId] = useState(defaultCategoryId);
   const [title, setTitle] = useState("");
+  const [activityQuery, setActivityQuery] = useState("");
+  const [createActivityOpen, setCreateActivityOpen] = useState(false);
   const [startTime, setStartTime] = useState("");
   const [timeZone, setTimeZone] = useState("Asia/Yerevan");
   const [isBusy, setIsBusy] = useState(false);
@@ -146,6 +151,18 @@ export function TrackerCard({
     return Math.max(0, Math.floor((now - start) / 1000));
   })();
 
+  function applyActivitySelection(activity: ActivitySelection) {
+    setTitle(activity.title);
+    setCategoryId(activity.categoryId);
+    setActivityQuery(activity.title);
+  }
+
+  function clearActivityPrefill() {
+    setTitle("");
+    setCategoryId(defaultCategoryId);
+    setActivityQuery("");
+  }
+
   async function onStart() {
     setError(null);
     if (!categoryId) return setError("Category is required.");
@@ -176,6 +193,7 @@ export function TrackerCard({
       });
       setActive(created);
       setTitle("");
+      setActivityQuery("");
       setStartTime("");
       router.refresh();
     } catch (e) {
@@ -249,6 +267,24 @@ export function TrackerCard({
           </>
         ) : (
           <>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                Activity
+              </label>
+              <ActivityCombobox
+                value={activityQuery}
+                onValueChange={(next) => {
+                  setActivityQuery(next);
+                  if (!next.trim()) clearActivityPrefill();
+                }}
+                onSelect={applyActivitySelection}
+                onClear={clearActivityPrefill}
+                onCreateNew={() => setCreateActivityOpen(true)}
+                placeholder="Search activities to pre-fill…"
+                disabled={isBusy}
+              />
+            </div>
+
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
                 Category
@@ -328,6 +364,14 @@ export function TrackerCard({
           </div>
         ) : null}
       </div>
+
+      <ActivityFormDialog
+        open={createActivityOpen}
+        onClose={() => setCreateActivityOpen(false)}
+        categories={categories}
+        initialTitle={activityQuery.trim() || undefined}
+        onSuccess={(activity) => applyActivitySelection(toActivitySelection(activity))}
+      />
     </div>
   );
 }

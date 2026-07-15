@@ -1,5 +1,7 @@
 import { headers } from "next/headers";
 import type { CategoryModel } from "@/app/generated/prisma/models";
+import { ActivityManager } from "./ActivityManager";
+import type { ActivityWithCategory } from "./ActivityFormDialog";
 import { CategoryManager } from "./CategoryManager";
 import { DataManager } from "./DataManager";
 import { TimezoneSettingsCard } from "./TimezoneSettingsCard";
@@ -26,8 +28,12 @@ export default async function SettingsPage() {
   const categoriesRes = await fetchJson<{ ok: boolean; data: CategoryModel[] }>(
     `${baseUrl}/api/categories?includeArchived=1`,
   );
+  const activitiesRes = await fetchJson<{ ok: boolean; data: ActivityWithCategory[] }>(
+    `${baseUrl}/api/activities?includeArchived=true`,
+  );
 
   const categories = categoriesRes.data ?? [];
+  const activities = activitiesRes.data ?? [];
   const active = categories.filter((c) => !c.isArchived);
   const archived = categories.filter((c) => c.isArchived);
 
@@ -38,12 +44,13 @@ export default async function SettingsPage() {
           Settings
         </h1>
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          Manage categories and keep your workflow tidy.
+          Manage categories, activity presets, and keep your workflow tidy.
         </p>
       </div>
 
       <TimezoneSettingsCard />
       <CategoryManager active={active} archived={archived} />
+      <ActivityManager activities={activities} categories={categories} />
       <WeeklyTargetsCard
         key={active.map((c) => `${c.id}:${c.weeklyTargetHours ?? ""}:${c.sortOrder}`).join("|")}
         active={active}

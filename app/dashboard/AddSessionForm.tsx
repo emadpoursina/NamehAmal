@@ -4,7 +4,29 @@ import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { CategoryModel } from "@/app/generated/prisma/models";
+import { ActivityCombobox, type ActivitySelection } from "@/app/components/ActivityCombobox";
 import { ymdAndHmToUtcIsoInTimeZone } from "@/app/lib/timezone";
+import { toActivitySelection } from "@/app/lib/use-activities";
+import { ActivityFormDialog } from "@/app/settings/ActivityFormDialog";
+
+const DEFAULT_START_TIME = "09:00";
+const DEFAULT_END_TIME = "09:25";
+
+// Add seconds to an HH:MM wall time, wrapping within the 24h clock.
+function addSecondsToHm(hm: string, seconds: number): string {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(hm.trim());
+  if (!match) return hm;
+
+  let totalMinutes =
+    Number.parseInt(match[1], 10) * 60 +
+    Number.parseInt(match[2], 10) +
+    Math.round(seconds / 60);
+  totalMinutes = ((totalMinutes % (24 * 60)) + 24 * 60) % (24 * 60);
+
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
 
 type SettingsResponse =
   | { ok: true; data: { id: string; timeZone: string } }
@@ -53,9 +75,11 @@ export function AddSessionForm({
 
   const [isOpen, setIsOpen] = useState(false);
   const [title, setTitle] = useState("");
+  const [activityQuery, setActivityQuery] = useState("");
+  const [createActivityOpen, setCreateActivityOpen] = useState(false);
   const [categoryId, setCategoryId] = useState(defaultCategoryId);
-  const [startTime, setStartTime] = useState("09:00");
-  const [endTime, setEndTime] = useState("09:25");
+  const [startTime, setStartTime] = useState(DEFAULT_START_TIME);
+  const [endTime, setEndTime] = useState(DEFAULT_END_TIME);
   const [timeZone, setTimeZone] = useState("Asia/Yerevan");
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,6 +98,26 @@ export function AddSessionForm({
     };
   }, []);
 
+  function applyActivitySelection(activity: ActivitySelection) {
+    setTitle(activity.title);
+    setCategoryId(activity.categoryId);
+    setActivityQuery(activity.title);
+    if (
+      typeof activity.defaultDurationSeconds === "number" &&
+      activity.defaultDurationSeconds > 0
+    ) {
+      setEndTime(addSecondsToHm(startTime, activity.defaultDurationSeconds));
+    }
+  }
+
+  function clearActivityPrefill() {
+    setTitle("");
+    setCategoryId(defaultCategoryId);
+    setActivityQuery("");
+    setStartTime(DEFAULT_START_TIME);
+    setEndTime(DEFAULT_END_TIME);
+  }
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
@@ -86,7 +130,7 @@ export function AddSessionForm({
 
     const tz = timeZone.trim();
     const startIso = ymdAndHmToUtcIsoInTimeZone(activeDate, startTime.trim(), tz);
-    let endIso = ymdAndHmToUtcIsoInTimeZone(activeDate, endTime.trim(), tz);
+    const endIso = ymdAndHmToUtcIsoInTimeZone(activeDate, endTime.trim(), tz);
     if (!startIso || !endIso) return setError("Invalid date, time, or timezone.");
 
     let endMs = new Date(endIso).getTime();
@@ -106,8 +150,9 @@ export function AddSessionForm({
         timeZone: tz,
       });
       setTitle("");
-      setStartTime("09:00");
-      setEndTime("09:25");
+      setActivityQuery("");
+      setStartTime(DEFAULT_START_TIME);
+      setEndTime(DEFAULT_END_TIME);
       setIsOpen(false);
       router.refresh();
     } catch (err) {
@@ -149,6 +194,24 @@ export function AddSessionForm({
       </div>
 
       <div className="mt-3 flex flex-col gap-3">
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+            Activity
+          </label>
+          <ActivityCombobox
+            value={activityQuery}
+            onValueChange={(next) => {
+              setActivityQuery(next);
+              if (!next.trim()) clearActivityPrefill();
+            }}
+            onSelect={applyActivitySelection}
+            onClear={clearActivityPrefill}
+            onCreateNew={() => setCreateActivityOpen(true)}
+            placeholder="Search activities to pre-fill…"
+            disabled={isSaving}
+          />
+        </div>
+
         <div className="flex flex-col gap-1.5">
           <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
             Title
@@ -238,6 +301,14 @@ export function AddSessionForm({
           </div>
         </div>
       </div>
+
+      <ActivityFormDialog
+        open={createActivityOpen}
+        onClose={() => setCreateActivityOpen(false)}
+        categories={categories}
+        initialTitle={activityQuery.trim() || undefined}
+        onSuccess={(activity) => applyActivitySelection(toActivitySelection(activity))}
+      />
     </form>
   );
 }
