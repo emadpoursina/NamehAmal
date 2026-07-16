@@ -4,9 +4,12 @@ title: Sessions Table Inline Activity Create
 intent: activity-presets
 complexity: low
 mode: autopilot
-status: pending
-depends_on: [activity-management-ui]
+status: completed
+depends_on:
+  - activity-management-ui
 created: 2026-07-15T07:48:00Z
+run_id: run-nameh-amal-002
+completed_at: 2026-07-15T17:20:13.925Z
 ---
 
 # Work Item: Sessions Table Inline Activity Create

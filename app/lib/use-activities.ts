@@ -18,17 +18,32 @@ type StoreSnapshot = {
 
 const EMPTY_ACTIVITIES: ActivityListItem[] = [];
 
+const SERVER_SNAPSHOT: StoreSnapshot = {
+  activities: EMPTY_ACTIVITIES,
+  loading: true,
+  error: null,
+};
+
 let cache: ActivityListItem[] | null = null;
 let inflight: Promise<ActivityListItem[]> | null = null;
 let error: string | null = null;
+let snapshot: StoreSnapshot = SERVER_SNAPSHOT;
 const listeners = new Set<() => void>();
 
-function getSnapshot(): StoreSnapshot {
-  return {
+function rebuildSnapshot() {
+  snapshot = {
     activities: cache ?? EMPTY_ACTIVITIES,
     loading: !cache && Boolean(inflight),
     error,
   };
+}
+
+function getSnapshot(): StoreSnapshot {
+  return snapshot;
+}
+
+function getServerSnapshot(): StoreSnapshot {
+  return SERVER_SNAPSHOT;
 }
 
 function subscribe(listener: () => void) {
@@ -37,6 +52,7 @@ function subscribe(listener: () => void) {
 }
 
 function notify() {
+  rebuildSnapshot();
   for (const listener of listeners) listener();
 }
 
@@ -86,7 +102,7 @@ export function invalidateActivitiesCache() {
 
 // Shared client hook for activity lists used by combobox surfaces.
 export function useActivities() {
-  const snapshot = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+  const store = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   useEffect(() => {
     if (!cache && !inflight) {
@@ -100,9 +116,9 @@ export function useActivities() {
   }, []);
 
   return {
-    activities: snapshot.activities,
-    loading: snapshot.loading,
-    error: snapshot.error,
+    activities: store.activities,
+    loading: store.loading,
+    error: store.error,
     refresh,
   };
 }

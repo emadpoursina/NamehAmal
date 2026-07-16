@@ -1,8 +1,9 @@
 ---
 id: activity-presets
 title: Activity Presets
-status: in_progress
+status: completed
 created: 2026-07-15T05:43:00Z
+completed_at: 2026-07-15T17:20:13.929Z
 ---
 
 # Intent: Activity Presets
