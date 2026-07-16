@@ -19,9 +19,27 @@ Capture user intent through guided conversation.
 
 <llm critical="true">
   <mandate>NEVER assume requirements — ALWAYS ask clarifying questions</mandate>
+  <mandate>Assess complexity and ask exactly 5, 10, or 20 discovery questions BEFORE writing any plan</mandate>
   <mandate>Capture the "what" and "why" — leave the "how" for decomposition</mandate>
-  <mandate>Let user describe freely — don't interrupt</mandate>
+  <mandate>Let user describe freely on the initial question — don't interrupt</mandate>
 </llm>
+
+<complexity_questioning>
+  After the initial description, classify complexity and set the question budget:
+
+  | Level | Questions | When to use |
+  |-------|-----------|-------------|
+  | Low | 5 | Single concern, few files, clear scope, no architecture decisions |
+  | Medium | 10 | Multiple components, integrations, moderate scope |
+  | High | 20 | Architecture, security, new subsystems, unclear or large scope |
+
+  Rules:
+  - Announce complexity level and question count to the user
+  - Track progress: "Question {n} of {total}"
+  - Ask one question at a time (or 2–3 when tightly related)
+  - Skip topics already covered by the user's answers
+  - Do NOT generate the intent brief until all questions are answered
+</complexity_questioning>
 
 <flow>
   <step n="1" title="Initial Question">
@@ -29,31 +47,55 @@ Capture user intent through guided conversation.
     <listen>Let user describe freely. Don't interrupt.</listen>
   </step>
 
-  <step n="2" title="Elicit Context">
-    <action>Based on response, ask follow-up questions:</action>
-
-    <question if="unclear who benefits">
-      Who is this for? Who will use this feature?
-    </question>
-
-    <question if="unclear problem">
-      What problem does this solve? What's painful today?
-    </question>
-
-    <question if="unclear scope">
-      What's the minimum that would be valuable? What can wait?
-    </question>
-
-    <question if="unclear constraints">
-      Any technical constraints? Existing systems to integrate with?
-    </question>
-
-    <question if="unclear success">
-      How will you know this is working? What does success look like?
-    </question>
+  <step n="2" title="Assess Complexity">
+    <action>Classify task as low, medium, or high complexity</action>
+    <action>Set question budget: low=5, medium=10, high=20</action>
+    <output>
+      Based on your description, I'm assessing this as **{level}** complexity.
+      I'll ask **{count}** discovery questions before writing the plan.
+    </output>
   </step>
 
-  <step n="3" title="Summarize Understanding">
+  <step n="3" title="Discovery Questioning">
+    <action>Ask exactly {count} targeted questions, one at a time</action>
+    <action>Track progress: "Question {n} of {count}"</action>
+    <action>Skip topics already answered in prior responses</action>
+
+    <topics level="low" count="5">
+      1. Goal — what exactly should exist when done?
+      2. Users — who benefits and how do they interact?
+      3. Scope — what's in vs. out for this iteration?
+      4. Constraints — tech stack, deadlines, existing code?
+      5. Success — how will we know it works?
+    </topics>
+
+    <topics level="medium" count="10">
+      Include all low topics, plus:
+      6. Problem — what pain exists today?
+      7. Data — what is stored, read, or transformed?
+      8. Integrations — external APIs, services, or modules?
+      9. UI/UX — screens, flows, or interaction patterns?
+      10. Edge cases — errors, empty states, permissions?
+    </topics>
+
+    <topics level="high" count="20">
+      Include all medium topics, plus:
+      11. Architecture — system boundaries, new vs. existing?
+      12. Security — auth, authorization, sensitive data?
+      13. Performance — latency, scale, concurrency?
+      14. Migration — backward compatibility, rollout?
+      15. Testing — acceptance tests, regression concerns?
+      16. Observability — logging, monitoring, alerting?
+      17. Dependencies — blocking work, external dependencies?
+      18. Risks — what could go wrong, what's unknown?
+      19. Alternatives — approaches considered or rejected?
+      20. Non-goals — what we are explicitly NOT building?
+    </topics>
+
+    <gate>Do NOT proceed until all {count} questions are answered</gate>
+  </step>
+
+  <step n="4" title="Summarize Understanding">
     <output>
       Let me make sure I understand:
 
@@ -75,24 +117,24 @@ Capture user intent through guided conversation.
       Is this accurate? [Y/n/edit]
     </output>
     <check if="response == n or edit">
-      <action>Ask specific clarifying questions</action>
-      <goto step="3"/>
+      <action>Ask specific clarifying questions (still within discovery budget if not yet complete)</action>
+      <goto step="4"/>
     </check>
   </step>
 
-  <step n="4" title="Generate Intent Brief">
+  <step n="5" title="Generate Intent Brief">
     <action>Create intent ID from title (kebab-case)</action>
     <action>Generate intent brief using template: templates/brief.md.hbs</action>
     <action>Create directory: .specs-fire/intents/{intent-id}/</action>
     <action>Save: .specs-fire/intents/{intent-id}/brief.md</action>
   </step>
 
-  <step n="5" title="Update State">
+  <step n="6" title="Update State">
     <action>Add intent to state.yaml</action>
     <action>Set intent status to "in_progress"</action>
   </step>
 
-  <step n="6" title="Transition">
+  <step n="7" title="Transition">
     <output>
       **Intent captured**: "{intent-title}"
 
@@ -116,6 +158,8 @@ Capture user intent through guided conversation.
 </output_artifacts>
 
 <success_criteria>
+  <criterion>Task complexity assessed (low/medium/high)</criterion>
+  <criterion>Exactly 5, 10, or 20 discovery questions asked and answered</criterion>
   <criterion>User intent fully understood through dialogue</criterion>
   <criterion>Goal, users, problem clearly captured</criterion>
   <criterion>Success criteria defined</criterion>

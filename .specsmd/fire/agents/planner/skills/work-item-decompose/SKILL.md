@@ -18,6 +18,7 @@ Break an intent into discrete, executable work items.
 </degrees_of_freedom>
 
 <llm critical="true">
+  <mandate>Do NOT write work items until discovery questioning is complete (5/10/20 questions per complexity)</mandate>
   <mandate>Each work item MUST be completable in a single run</mandate>
   <mandate>Each work item MUST have clear acceptance criteria</mandate>
   <mandate>Dependencies MUST be explicit and validated</mandate>
@@ -27,6 +28,11 @@ Break an intent into discrete, executable work items.
   <step n="1" title="Load Intent">
     <action>Read intent brief from .specs-fire/intents/{intent-id}/brief.md</action>
     <action>Understand goal, users, success criteria</action>
+
+    <check if="brief lacks detail from discovery questioning">
+      <output>Intent brief is incomplete. Returning to discovery questioning before writing the plan.</output>
+      <invoke_skill>intent-capture</invoke_skill>
+    </check>
   </step>
 
   <step n="2" title="Identify Deliverables">
@@ -156,6 +162,7 @@ Break an intent into discrete, executable work items.
 </output_artifacts>
 
 <success_criteria>
+  <criterion>Discovery questioning completed before plan was written</criterion>
   <criterion>Intent decomposed into discrete work items</criterion>
   <criterion>Each work item has clear acceptance criteria</criterion>
   <criterion>Complexity assessed for each item</criterion>
