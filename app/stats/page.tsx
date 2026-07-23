@@ -1,4 +1,3 @@
-import { headers } from "next/headers";
 import type { CategoryModel } from "@/app/generated/prisma/models";
 import { formatDuration } from "@/app/dashboard/format";
 import {
@@ -8,6 +7,7 @@ import {
 } from "@/app/lib/local-week";
 import { ymdToUtcRangeInTimeZone } from "@/app/lib/timezone";
 import { getDefaultTimeZone } from "@/app/server/app-settings";
+import { getInternalBaseUrl } from "@/app/server/internal-base-url";
 import { StatsFilters } from "@/app/stats/StatsFilters";
 import { WeekGoalsTable, type WeekGoalRow } from "@/app/stats/WeekGoalsTable";
 
@@ -29,14 +29,6 @@ type CategoriesStatsResponse = {
   };
   error?: string;
 };
-
-// Build an absolute URL for internal API fetches.
-async function getBaseUrl() {
-  const h = await headers();
-  const proto = h.get("x-forwarded-proto") ?? "http";
-  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
-  return `${proto}://${host}`;
-}
 
 // Fetch JSON and throw on non-2xx responses.
 async function fetchJson<T>(url: string): Promise<T> {
@@ -79,7 +71,7 @@ export default async function StatsPage({
   const occurredFrom = fromRange?.from ?? new Date();
   const occurredTo = toRange?.to ?? new Date();
 
-  const baseUrl = await getBaseUrl();
+  const baseUrl = getInternalBaseUrl();
   const categoriesRes = await fetchJson<{ ok: boolean; data: CategoryModel[] }>(
     `${baseUrl}/api/categories?includeArchived=1`,
   );

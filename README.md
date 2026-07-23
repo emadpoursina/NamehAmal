@@ -52,7 +52,25 @@ bunx prisma migrate dev
 bun run dev
 ```
 
-Open `http://localhost:3000`.
+Open `http://localhost:3060`.
+
+## Docker
+
+Production image (Next.js standalone + SQLite volume). Listens on **3060**, same as local `bun run start`, so an existing reverse proxy to that port (e.g. `http://nml.localhost/` → `127.0.0.1:3060`) keeps working.
+
+```bash
+docker compose up --build
+```
+
+Open `http://nml.localhost/` (or `http://localhost:3060`). Database file persists in the `nameh-amal-data` volume at `/data/nameh-amal.db`.
+
+```bash
+# image only
+docker build -t nameh-amal .
+docker run --rm -p 3060:3060 -v nameh-amal-data:/data nameh-amal
+```
+
+For `bun run dev` behind `nml.localhost`, keep `ALLOWED_DEV_ORIGINS=nml.localhost` in `.env` (see `.env.example`). Production Docker ignores that variable.
 
 The default dev script uses **webpack** (`next dev --webpack`) because Turbopack can panic during HMR with `Next.js package not found`, which makes the browser reload in a loop. To try Turbopack anyway:
 

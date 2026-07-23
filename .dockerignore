@@ -1,0 +1,79 @@
+############################################################
+# Keep Docker builds fast and free of local/dev artifacts
+############################################################
+
+# Dependencies (installed inside the image)
+node_modules/
+.pnpm-store/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Next.js / build outputs
+.next/
+out/
+dist/
+build/
+.vercel/
+*.tsbuildinfo
+app/generated/prisma/
+
+# Local SQLite databases
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+*.db-trace
+*.db-trace-journal
+*.db-trace-wal
+
+# Tests
+coverage/
+.vitest/
+vitest.config.*
+*.test.*
+*.spec.*
+
+# Git / editors
+.git/
+.gitignore
+.gitattributes
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Env (inject via compose / runtime)
+.env
+.env*.local
+.env.development
+.env.test
+.env.production.local
+
+# Docker files (not needed in build context)
+Dockerfile*
+.dockerignore
+compose.yaml
+compose.yml
+docker-compose*.yaml
+docker-compose*.yml
+
+# Docs / tooling metadata
+*.md
+docs/
+.cursor/
+.specs-fire/
+.specsmd/
+AGENTS.md
+CLAUDE.md
+.DS_Store
+
+# Bun lock (npm package-lock.json is used in the image)
+bun.lock
+bun.lockb
+.bun/
+
+# Scripts not required for production image
+scripts/

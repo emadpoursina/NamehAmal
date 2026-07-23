@@ -1,19 +1,11 @@
-import { headers } from "next/headers";
 import type { CategoryModel } from "@/app/generated/prisma/models";
+import { getInternalBaseUrl } from "@/app/server/internal-base-url";
 import { ActivityManager } from "./ActivityManager";
 import type { ActivityWithCategory } from "./ActivityFormDialog";
 import { CategoryManager } from "./CategoryManager";
 import { DataManager } from "./DataManager";
 import { TimezoneSettingsCard } from "./TimezoneSettingsCard";
 import { WeeklyTargetsCard } from "./WeeklyTargetsCard";
-
-// Build an absolute URL for internal API fetches.
-async function getBaseUrl() {
-  const h = await headers();
-  const proto = h.get("x-forwarded-proto") ?? "http";
-  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
-  return `${proto}://${host}`;
-}
 
 // Fetch JSON and throw on non-2xx responses.
 async function fetchJson<T>(url: string): Promise<T> {
@@ -24,7 +16,7 @@ async function fetchJson<T>(url: string): Promise<T> {
 
 // Render the Settings page with category management.
 export default async function SettingsPage() {
-  const baseUrl = await getBaseUrl();
+  const baseUrl = getInternalBaseUrl();
   const categoriesRes = await fetchJson<{ ok: boolean; data: CategoryModel[] }>(
     `${baseUrl}/api/categories?includeArchived=1`,
   );

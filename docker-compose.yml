@@ -1,0 +1,18 @@
+services:
+  app:
+    build: .
+    # Same host port as local start / nml.localhost reverse proxy
+    ports:
+      - "3060:3060"
+    environment:
+      # Override .env's file:./dev.db with the container volume path
+      DATABASE_URL: file:/data/nameh-amal.db
+      PORT: "3060"
+      HOSTNAME: 0.0.0.0
+    volumes:
+      # Persist SQLite across container restarts
+      - nameh-amal-data:/data
+    restart: unless-stopped
+
+volumes:
+  nameh-amal-data:

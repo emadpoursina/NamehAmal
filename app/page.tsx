@@ -1,4 +1,3 @@
-import { headers } from "next/headers";
 import type { CategoryModel, SessionModel } from "@/app/generated/prisma/models";
 import { AddSessionForm } from "@/app/dashboard/AddSessionForm";
 import { DashboardFilters } from "@/app/dashboard/DashboardFilters";
@@ -6,16 +5,9 @@ import { SessionsTable } from "@/app/dashboard/SessionsTable";
 import { TrackerCard } from "@/app/dashboard/TrackerCard";
 import { formatYmdInTimeZone, ymdToUtcRangeInTimeZone } from "@/app/lib/timezone";
 import { getDefaultTimeZone } from "@/app/server/app-settings";
+import { getInternalBaseUrl } from "@/app/server/internal-base-url";
 
 type SessionWithCategory = SessionModel & { category: CategoryModel };
-
-// Build an absolute URL for internal API fetches.
-async function getBaseUrl() {
-  const h = await headers();
-  const proto = h.get("x-forwarded-proto") ?? "http";
-  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
-  return `${proto}://${host}`;
-}
 
 // Fetch JSON and throw on non-2xx responses.
 async function fetchJson<T>(url: string): Promise<T> {
@@ -41,8 +33,7 @@ export default async function DashboardPage({
   const activeDate = ymdToUtcRangeInTimeZone(dateRaw, defaultTimeZone) ? dateRaw : todayYmd;
   const range = ymdToUtcRangeInTimeZone(activeDate, defaultTimeZone);
 
-  // Build the base URL for API requests
-  const baseUrl = await getBaseUrl();
+  const baseUrl = getInternalBaseUrl();
 
   // Fetch all categories
   const categoriesRes = await fetchJson<{ ok: boolean; data: CategoryModel[] }>(
