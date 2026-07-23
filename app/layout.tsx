@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
+import { PomodoroProvider } from "@/app/lib/pomodoro/PomodoroProvider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -46,6 +47,12 @@ export default function RootLayout({
                 Dashboard
               </Link>
               <Link
+                href="/pomodoro"
+                className="rounded-md px-2.5 py-1 text-sm text-zinc-700 transition-colors duration-150 hover:bg-zinc-50 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-950 dark:hover:text-zinc-100"
+              >
+                Pomodoro
+              </Link>
+              <Link
                 href="/settings"
                 className="rounded-md px-2.5 py-1 text-sm text-zinc-700 transition-colors duration-150 hover:bg-zinc-50 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-950 dark:hover:text-zinc-100"
               >
@@ -60,7 +67,7 @@ export default function RootLayout({
             </nav>
           </div>
         </header>
-        {children}
+        <PomodoroProvider>{children}</PomodoroProvider>
       </body>
     </html>
   );

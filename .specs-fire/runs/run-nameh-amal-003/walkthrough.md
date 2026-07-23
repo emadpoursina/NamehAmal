@@ -1,0 +1,159 @@
+---
+run: run-nameh-amal-003
+work_item: pomodoro-core-engine,pomodoro-page
+intent: pomodoro-timer
+generated: 2026-07-23T12:48:00Z
+mode: confirm
+---
+
+# Implementation Walkthrough: Pomodoro Core Engine + Page
+
+## Summary
+
+Implemented a client-side Pomodoro timer system for nameh-amal: a pure state machine with React context, localStorage persistence, and a dedicated `/pomodoro` page with timer controls and settings. Fully decoupled from the session tracker.
+
+## Structure Overview
+
+```
+app/lib/pomodoro/
+├── types.ts          — Phase/settings/state types + defaults
+├── engine.ts         — Pure state machine (start/stop/skip/tick)
+├── storage.ts        — localStorage read/write
+├── format.ts         — MM:SS display helpers
+├── PomodoroProvider.tsx — React context + 1s interval tick
+└── use-pomodoro.ts    — Consumer hook
+
+app/pomodoro/
+├── page.tsx          — Server page shell
+└── PomodoroView.tsx  — Timer UI + settings form (client)
+
+app/layout.tsx        — PomodoroProvider wrap + nav link
+```
+
+## Architecture
+
+### Pattern Used
+
+Pure domain logic + React context provider (separation of concerns). Engine is framework-agnostic and unit-tested; UI is a thin consumer.
+
+### Layer Structure
+
+```text
+┌─────────────────────────────────────┐
+│  PomodoroView (UI)                  │
+├─────────────────────────────────────┤
+│  PomodoroProvider (React context)   │
+├─────────────────────────────────────┤
+│  engine.ts (pure state machine)     │
+├─────────────────────────────────────┤
+│  storage.ts (localStorage)          │
+└─────────────────────────────────────┘
+```
+
+## Files Changed
+
+### Created
+
+| File | Purpose |
+|------|---------|
+| `app/lib/pomodoro/types.ts` | Types and default settings |
+| `app/lib/pomodoro/engine.ts` | State machine logic |
+| `app/lib/pomodoro/engine.test.ts` | Engine unit tests |
+| `app/lib/pomodoro/storage.ts` | localStorage persistence |
+| `app/lib/pomodoro/format.ts` | Countdown formatting |
+| `app/lib/pomodoro/format.test.ts` | Format unit tests |
+| `app/lib/pomodoro/PomodoroProvider.tsx` | React provider |
+| `app/lib/pomodoro/use-pomodoro.ts` | Hook |
+| `app/pomodoro/page.tsx` | Pomodoro route |
+| `app/pomodoro/PomodoroView.tsx` | Timer + settings UI |
+| `vitest.config.ts` | Test runner config |
+
+### Modified
+
+| File | Changes |
+|------|---------|
+| `app/layout.tsx` | `PomodoroProvider` wrap + Pomodoro nav link |
+| `package.json` | Added vitest + `test` script |
+
+## Key Implementation Details
+
+### 1. Phase cycling
+
+Focus completes → short rest (or long rest every N sessions) → focus. Long rest resets the focus-session cadence counter.
+
+### 2. Controls
+
+Start (idle→focus or resume), Stop (cancel to idle), Skip (advance phase + emit completion). No pause.
+
+### 3. Settings deferral
+
+`updateSettings()` updates config immediately but only changes `remainingSeconds` when idle — running phases keep their current countdown.
+
+### 4. Phase-complete signal
+
+`subscribePhaseComplete()` on context for future alert UI (modal + sound work item).
+
+## Decisions Made
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| State storage | localStorage only | Work item requires no DB; matches local-first app |
+| Provider location | Root layout | Enables future floating widget to share engine |
+| Test framework | Vitest | Per testing standards recommendation |
+| Settings UI units | Minutes in form, seconds in engine | Matches user mental model; engine stores seconds |
+
+## Deviations from Plan
+
+None
+
+## Dependencies Added
+
+| Package | Why Needed |
+|---------|------------|
+| `vitest` | First automated test suite for engine + format helpers |
+
+## How to Verify
+
+1. **Run tests**
+   ```bash
+   bun run test
+   ```
+   Expected: 14 tests pass
+
+2. **Start dev server and open Pomodoro page**
+   ```bash
+   bun run dev
+   ```
+   Navigate to `http://localhost:3000/pomodoro`
+
+3. **Manual timer flow**
+   - Click Start → countdown begins in Focus phase
+   - Click Skip → advances to Short rest
+   - Click Stop → returns to Idle
+   - Change settings, save → new durations apply on next phase
+
+4. **Persistence**
+   - Change settings, reload page → values restored from localStorage
+
+## Test Coverage
+
+- Tests added: 14
+- Coverage: not configured
+- Status: All passing
+
+## Ready for Review
+
+- [x] All acceptance criteria met
+- [x] Tests passing
+- [x] No critical issues
+- [ ] Documentation updated (if applicable)
+- [x] Developer notes captured
+
+## Developer Notes
+
+- `subscribePhaseComplete` is ready for the Phase End Alert work item — subscribe in a client component to show modal + sound.
+- Widget visibility (`setWidgetHidden`) is wired in the engine/provider but UI comes in the Floating Widget work item.
+- ESLint `react-hooks/set-state-in-effect` rule is strict — avoid syncing form state from context via effects; initialize on mount instead.
+
+---
+*Generated by specs.md - fabriqa.ai FIRE Flow Run run-nameh-amal-003*
