@@ -4,7 +4,6 @@ import {
 } from "./types";
 
 const SETTINGS_KEY = "nameh-amal:pomodoro:settings";
-const WIDGET_HIDDEN_KEY = "nameh-amal:pomodoro:widget-hidden";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -57,21 +56,4 @@ export function loadPomodoroSettings(): PomodoroSettings {
 export function savePomodoroSettings(settings: PomodoroSettings): void {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-}
-
-/** Load widget visibility preference from localStorage. */
-export function loadWidgetHidden(): boolean {
-  if (typeof window === "undefined") return false;
-
-  try {
-    return window.localStorage.getItem(WIDGET_HIDDEN_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-
-/** Persist widget visibility preference. */
-export function saveWidgetHidden(hidden: boolean): void {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(WIDGET_HIDDEN_KEY, hidden ? "1" : "0");
 }

@@ -29,7 +29,6 @@ export function getPhaseDuration(
 
 export function createInitialState(
   settings: PomodoroSettings = DEFAULT_POMODORO_SETTINGS,
-  widgetHidden = false,
 ): PomodoroState {
   return {
     phase: "idle",
@@ -37,7 +36,6 @@ export function createInitialState(
     isRunning: false,
     completedFocusSessions: 0,
     settings: { ...settings },
-    widgetHidden,
   };
 }
 
@@ -147,11 +145,4 @@ export function updateSettings(
     settings,
     remainingSeconds: settings.focusSeconds,
   };
-}
-
-export function setWidgetHidden(
-  state: PomodoroState,
-  widgetHidden: boolean,
-): PomodoroState {
-  return { ...state, widgetHidden };
 }

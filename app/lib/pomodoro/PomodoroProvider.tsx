@@ -11,22 +11,15 @@ import {
 } from "react";
 import {
   createInitialState,
-  setWidgetHidden,
   skip,
   start,
   stop,
   tick,
   updateSettings,
 } from "./engine";
-import {
-  loadPomodoroSettings,
-  loadWidgetHidden,
-  savePomodoroSettings,
-  saveWidgetHidden,
-} from "./storage";
+import { loadPomodoroSettings, savePomodoroSettings } from "./storage";
 import type { ActivePomodoroPhase, PomodoroPhase, PomodoroSettings, PomodoroState } from "./types";
 import { PomodoroPhaseAlert } from "./PomodoroPhaseAlert";
-import { PomodoroFloatingWidget } from "./PomodoroFloatingWidget";
 
 type PomodoroContextValue = {
   state: PomodoroState;
@@ -34,7 +27,6 @@ type PomodoroContextValue = {
   stop: () => void;
   skip: () => void;
   updateSettings: (partial: Partial<PomodoroSettings>) => void;
-  setWidgetHidden: (hidden: boolean) => void;
   subscribePhaseComplete: (
     fn: (phase: ActivePomodoroPhase, nextPhase: PomodoroPhase) => void,
   ) => () => void;
@@ -44,7 +36,7 @@ export const PomodoroContext = createContext<PomodoroContextValue | null>(null);
 
 export function PomodoroProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<PomodoroState>(() =>
-    createInitialState(loadPomodoroSettings(), loadWidgetHidden()),
+    createInitialState(loadPomodoroSettings()),
   );
   const phaseCompleteListeners = useRef(
     new Set<(phase: ActivePomodoroPhase, nextPhase: PomodoroPhase) => void>(),
@@ -53,10 +45,6 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     savePomodoroSettings(state.settings);
   }, [state.settings]);
-
-  useEffect(() => {
-    saveWidgetHidden(state.widgetHidden);
-  }, [state.widgetHidden]);
 
   const emitPhaseComplete = useCallback(
     (phase: ActivePomodoroPhase, nextPhase: PomodoroPhase) => {
@@ -107,10 +95,6 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     setState((current) => updateSettings(current, partial));
   }, []);
 
-  const handleSetWidgetHidden = useCallback((hidden: boolean) => {
-    setState((current) => setWidgetHidden(current, hidden));
-  }, []);
-
   const subscribePhaseComplete = useCallback(
     (fn: (phase: ActivePomodoroPhase, nextPhase: PomodoroPhase) => void) => {
       phaseCompleteListeners.current.add(fn);
@@ -128,7 +112,6 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
       stop: handleStop,
       skip: handleSkip,
       updateSettings: handleUpdateSettings,
-      setWidgetHidden: handleSetWidgetHidden,
       subscribePhaseComplete,
     }),
     [
@@ -137,7 +120,6 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
       handleStop,
       handleSkip,
       handleUpdateSettings,
-      handleSetWidgetHidden,
       subscribePhaseComplete,
     ],
   );
@@ -145,7 +127,6 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
   return (
     <PomodoroContext.Provider value={value}>
       <PomodoroPhaseAlert />
-      <PomodoroFloatingWidget />
       {children}
     </PomodoroContext.Provider>
   );

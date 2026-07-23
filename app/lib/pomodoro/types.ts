@@ -20,7 +20,6 @@ export type PomodoroState = {
   isRunning: boolean;
   completedFocusSessions: number;
   settings: PomodoroSettings;
-  widgetHidden: boolean;
 };
 
 export type ActivePomodoroPhase = Exclude<PomodoroPhase, "idle">;
