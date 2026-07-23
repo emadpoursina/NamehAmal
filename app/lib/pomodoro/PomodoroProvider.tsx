@@ -26,6 +26,7 @@ import {
 } from "./storage";
 import type { ActivePomodoroPhase, PomodoroPhase, PomodoroSettings, PomodoroState } from "./types";
 import { PomodoroPhaseAlert } from "./PomodoroPhaseAlert";
+import { PomodoroFloatingWidget } from "./PomodoroFloatingWidget";
 
 type PomodoroContextValue = {
   state: PomodoroState;
@@ -144,6 +145,7 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
   return (
     <PomodoroContext.Provider value={value}>
       <PomodoroPhaseAlert />
+      <PomodoroFloatingWidget />
       {children}
     </PomodoroContext.Provider>
   );

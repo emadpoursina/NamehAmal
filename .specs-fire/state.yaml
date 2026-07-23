@@ -45,12 +45,14 @@ intents:
         completed_at: 2026-07-23T12:49:45.326Z
       - id: pomodoro-floating-widget
         title: Floating Widget
-        status: pending
+        status: completed
         complexity: medium
         mode: confirm
         depends_on:
           - pomodoro-core-engine
           - pomodoro-phase-alert
+        run_id: run-nameh-amal-005
+        completed_at: 2026-07-23T12:53:11.859Z
   - id: activity-presets
     title: Activity Presets
     status: in_progress
@@ -172,3 +174,11 @@ runs:
           mode: autopilot
       started: 2026-07-23T12:48:56.462Z
       completed: 2026-07-23T12:49:45.326Z
+    - id: run-nameh-amal-005
+      scope: single
+      work_items:
+        - id: pomodoro-floating-widget
+          intent: pomodoro-timer
+          mode: confirm
+      started: 2026-07-23T12:52:31.398Z
+      completed: 2026-07-23T12:53:11.859Z

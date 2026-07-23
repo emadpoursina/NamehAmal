@@ -4,9 +4,13 @@ title: Floating Widget
 intent: pomodoro-timer
 complexity: medium
 mode: confirm
-status: pending
-depends_on: [pomodoro-core-engine, pomodoro-phase-alert]
+status: completed
+depends_on:
+  - pomodoro-core-engine
+  - pomodoro-phase-alert
 created: 2026-07-23T09:48:54Z
+run_id: run-nameh-amal-005
+completed_at: 2026-07-23T12:53:11.859Z
 ---
 
 # Work Item: Floating Widget

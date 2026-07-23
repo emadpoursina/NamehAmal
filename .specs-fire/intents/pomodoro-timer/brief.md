@@ -1,8 +1,9 @@
 ---
 id: pomodoro-timer
 title: Pomodoro Timer
-status: in_progress
+status: completed
 created: 2026-07-23T09:41:12Z
+completed_at: 2026-07-23T12:53:11.864Z
 ---
 
 # Intent: Pomodoro Timer
