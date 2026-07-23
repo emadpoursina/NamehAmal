@@ -6,15 +6,8 @@ import {
   minutesToSeconds,
   secondsToMinutes,
 } from "@/app/lib/pomodoro/format";
+import { PHASE_LABELS } from "@/app/lib/pomodoro/phase-labels";
 import { usePomodoro } from "@/app/lib/pomodoro/use-pomodoro";
-import type { PomodoroPhase } from "@/app/lib/pomodoro/types";
-
-const PHASE_LABELS: Record<PomodoroPhase, string> = {
-  idle: "Idle",
-  focus: "Focus",
-  short_rest: "Short rest",
-  long_rest: "Long rest",
-};
 
 function settingsToFormValues(settings: {
   focusSeconds: number;

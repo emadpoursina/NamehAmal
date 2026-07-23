@@ -24,7 +24,8 @@ import {
   savePomodoroSettings,
   saveWidgetHidden,
 } from "./storage";
-import type { ActivePomodoroPhase, PomodoroSettings, PomodoroState } from "./types";
+import type { ActivePomodoroPhase, PomodoroPhase, PomodoroSettings, PomodoroState } from "./types";
+import { PomodoroPhaseAlert } from "./PomodoroPhaseAlert";
 
 type PomodoroContextValue = {
   state: PomodoroState;
@@ -33,7 +34,9 @@ type PomodoroContextValue = {
   skip: () => void;
   updateSettings: (partial: Partial<PomodoroSettings>) => void;
   setWidgetHidden: (hidden: boolean) => void;
-  subscribePhaseComplete: (fn: (phase: ActivePomodoroPhase) => void) => () => void;
+  subscribePhaseComplete: (
+    fn: (phase: ActivePomodoroPhase, nextPhase: PomodoroPhase) => void,
+  ) => () => void;
 };
 
 export const PomodoroContext = createContext<PomodoroContextValue | null>(null);
@@ -42,7 +45,9 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<PomodoroState>(() =>
     createInitialState(loadPomodoroSettings(), loadWidgetHidden()),
   );
-  const phaseCompleteListeners = useRef(new Set<(phase: ActivePomodoroPhase) => void>());
+  const phaseCompleteListeners = useRef(
+    new Set<(phase: ActivePomodoroPhase, nextPhase: PomodoroPhase) => void>(),
+  );
 
   useEffect(() => {
     savePomodoroSettings(state.settings);
@@ -52,9 +57,12 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     saveWidgetHidden(state.widgetHidden);
   }, [state.widgetHidden]);
 
-  const emitPhaseComplete = useCallback((phase: ActivePomodoroPhase) => {
-    for (const fn of phaseCompleteListeners.current) fn(phase);
-  }, []);
+  const emitPhaseComplete = useCallback(
+    (phase: ActivePomodoroPhase, nextPhase: PomodoroPhase) => {
+      for (const fn of phaseCompleteListeners.current) fn(phase, nextPhase);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!state.isRunning) return;
@@ -63,7 +71,9 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
       setState((current) => {
         const result = tick(current);
         if (result.phaseCompleted) {
-          queueMicrotask(() => emitPhaseComplete(result.phaseCompleted!));
+          queueMicrotask(() =>
+            emitPhaseComplete(result.phaseCompleted!, result.state.phase),
+          );
         }
         return result.state;
       });
@@ -84,7 +94,9 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     setState((current) => {
       const result = skip(current);
       if (result.phaseCompleted) {
-        queueMicrotask(() => emitPhaseComplete(result.phaseCompleted!));
+        queueMicrotask(() =>
+          emitPhaseComplete(result.phaseCompleted!, result.state.phase),
+        );
       }
       return result.state;
     });
@@ -99,7 +111,7 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const subscribePhaseComplete = useCallback(
-    (fn: (phase: ActivePomodoroPhase) => void) => {
+    (fn: (phase: ActivePomodoroPhase, nextPhase: PomodoroPhase) => void) => {
       phaseCompleteListeners.current.add(fn);
       return () => {
         phaseCompleteListeners.current.delete(fn);
@@ -130,6 +142,9 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
   );
 
   return (
-    <PomodoroContext.Provider value={value}>{children}</PomodoroContext.Provider>
+    <PomodoroContext.Provider value={value}>
+      <PomodoroPhaseAlert />
+      {children}
+    </PomodoroContext.Provider>
   );
 }
