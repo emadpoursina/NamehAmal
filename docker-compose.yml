@@ -5,14 +5,11 @@ services:
     ports:
       - "3060:3060"
     environment:
-      # Override .env's file:./dev.db with the container volume path
-      DATABASE_URL: file:/data/nameh-amal.db
+      # Use the host dev.db bind-mounted below (same file as local file:./dev.db)
+      DATABASE_URL: file:/workspace/dev.db
       PORT: "3060"
       HOSTNAME: 0.0.0.0
     volumes:
-      # Persist SQLite across container restarts
-      - nameh-amal-data:/data
+      # Bind-mount project root so dev.db (and any SQLite WAL/SHM sidecars) stay on the host
+      - .:/workspace
     restart: unless-stopped
-
-volumes:
-  nameh-amal-data:

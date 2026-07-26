@@ -54,14 +54,14 @@ WORKDIR /app
 RUN apt-get update \
   && apt-get install -y --no-install-recommends openssl ca-certificates \
   && rm -rf /var/lib/apt/lists/* \
-  && mkdir -p /data .next \
-  && chown node:node /data .next
+  && mkdir -p /workspace .next \
+  && chown node:node /workspace .next
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3060
 ENV HOSTNAME=0.0.0.0
-ENV DATABASE_URL="file:/data/nameh-amal.db"
+ENV DATABASE_URL="file:/workspace/dev.db"
 
 # Isolated Prisma CLI (avoids reinstalling the full app dependency tree)
 WORKDIR /opt/prisma-cli
@@ -92,7 +92,7 @@ USER node
 
 EXPOSE 3060
 
-VOLUME ["/data"]
+VOLUME ["/workspace"]
 
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["node", "server.js"]
