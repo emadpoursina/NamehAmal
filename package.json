@@ -8,8 +8,8 @@
     "build": "next build",
     "start": "HOSTNAME=0.0.0.0 PORT=3060 next start",
     "update": "node scripts/update.mjs",
-    "docker:up": "node scripts/docker-up.mjs",
-    "docker:down": "node scripts/docker-down.mjs",
+    "stack:up": "node scripts/docker-up.mjs",
+    "stack:down": "node scripts/docker-down.mjs",
     "lint": "eslint",
     "test": "vitest run"
   },
