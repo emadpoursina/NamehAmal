@@ -46,7 +46,8 @@ bun.lockb
 .bun
 
 # cursor
-.cursor
+.cursor/*
+!.cursor/environment.json
 cursor
 
 # prisma
