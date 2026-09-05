@@ -7,6 +7,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import {
@@ -78,8 +79,13 @@ function debugLog(
   }).catch(() => {});
 }
 
+const subscribeToHydration = () => () => {};
+const getHydratedSnapshot = () => true;
+const getServerHydratedSnapshot = () => false;
+
 type PomodoroContextValue = {
   state: PomodoroState;
+  isHydrated: boolean;
   start: () => void;
   stop: () => void;
   skip: () => void;
@@ -97,6 +103,11 @@ type InitialPomodoroState = {
 };
 
 export function PomodoroProvider({ children }: { children: ReactNode }) {
+  const isHydrated = useSyncExternalStore(
+    subscribeToHydration,
+    getHydratedSnapshot,
+    getServerHydratedSnapshot,
+  );
   const [initialState] = useState<InitialPomodoroState>(() => {
     const settings = loadPomodoroSettings();
     const loaded = loadPomodoroRun(settings);
@@ -274,6 +285,7 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       state,
+      isHydrated,
       start: handleStart,
       stop: handleStop,
       skip: handleSkip,
@@ -282,6 +294,7 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     }),
     [
       state,
+      isHydrated,
       handleStart,
       handleStop,
       handleSkip,
