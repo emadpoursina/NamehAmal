@@ -1,6 +1,6 @@
 {
   "name": "nameh-amal",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "private": true,
   "scripts": {
     "dev": "PORT=3060 next dev --webpack",

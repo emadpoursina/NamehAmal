@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.1.4] - 2026-09-05
+### Fixed
+- Pomodoro now waits for browser persistence to hydrate before rendering timer controls, preventing stale idle controls in a new tab.
+
 ## [0.1.3] - 2026-09-05
 ### Fixed
 - Pomodoro timers now continue across refreshes and new tabs using their saved phase end time.
