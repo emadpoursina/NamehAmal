@@ -17,6 +17,7 @@ export const DEFAULT_POMODORO_SETTINGS: PomodoroSettings = {
 export type PomodoroState = {
   phase: PomodoroPhase;
   remainingSeconds: number;
+  phaseEndsAtMs: number | null;
   isRunning: boolean;
   completedFocusSessions: number;
   settings: PomodoroSettings;
