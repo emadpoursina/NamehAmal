@@ -45,11 +45,6 @@ bun.lock
 bun.lockb
 .bun
 
-# cursor
-.cursor/*
-!.cursor/environment.json
-cursor
-
 # prisma
 /app/generated/prisma
 
