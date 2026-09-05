@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.1.5] - 2026-09-05
+### Fixed
+- Cleared all remaining repository lint errors and warnings.
+
 ## [0.1.4] - 2026-09-05
 ### Fixed
 - Pomodoro now waits for browser persistence to hydrate before rendering timer controls, preventing stale idle controls in a new tab.
