@@ -33,25 +33,32 @@ export function createInitialState(
   return {
     phase: "idle",
     remainingSeconds: settings.focusSeconds,
+    phaseEndsAtMs: null,
     isRunning: false,
     completedFocusSessions: 0,
     settings: { ...settings },
   };
 }
 
-export function start(state: PomodoroState): PomodoroState {
+export function start(state: PomodoroState, now = Date.now()): PomodoroState {
   if (state.isRunning) return state;
 
   if (state.phase === "idle") {
+    const remainingSeconds = state.settings.focusSeconds;
     return {
       ...state,
       phase: "focus",
-      remainingSeconds: state.settings.focusSeconds,
+      remainingSeconds,
+      phaseEndsAtMs: now + remainingSeconds * 1000,
       isRunning: true,
     };
   }
 
-  return { ...state, isRunning: true };
+  return {
+    ...state,
+    phaseEndsAtMs: now + state.remainingSeconds * 1000,
+    isRunning: true,
+  };
 }
 
 /** Cancel the current run and return to idle without changing settings or cadence. */
@@ -60,6 +67,7 @@ export function stop(state: PomodoroState): PomodoroState {
     ...state,
     phase: "idle",
     remainingSeconds: state.settings.focusSeconds,
+    phaseEndsAtMs: null,
     isRunning: false,
   };
 }
@@ -78,6 +86,7 @@ function advanceAfterPhase(
       ...state,
       phase: nextPhase,
       remainingSeconds: getPhaseDuration(nextPhase, state.settings),
+      phaseEndsAtMs: null,
       isRunning: false,
       completedFocusSessions,
     };
@@ -89,6 +98,7 @@ function advanceAfterPhase(
     ...state,
     phase: "focus",
     remainingSeconds: state.settings.focusSeconds,
+    phaseEndsAtMs: null,
     isRunning: false,
     completedFocusSessions: resetCadence ? 0 : state.completedFocusSessions,
   };
@@ -111,22 +121,51 @@ export function skip(state: PomodoroState): PhaseTransitionResult {
     return { state, phaseCompleted: null };
   }
 
-  return completeCurrentPhase({ ...state, isRunning: false });
+  return completeCurrentPhase({ ...state, isRunning: false, phaseEndsAtMs: null });
 }
 
-export function tick(state: PomodoroState): PhaseTransitionResult {
+export function tick(state: PomodoroState, now = Date.now()): PhaseTransitionResult {
   if (!state.isRunning || state.phase === "idle") {
     return { state, phaseCompleted: null };
   }
 
-  if (state.remainingSeconds > 1) {
+  if (state.phaseEndsAtMs === null) {
     return {
-      state: { ...state, remainingSeconds: state.remainingSeconds - 1 },
+      state: {
+        ...state,
+        phaseEndsAtMs: now + state.remainingSeconds * 1000,
+      },
       phaseCompleted: null,
     };
   }
 
-  return completeCurrentPhase({ ...state, remainingSeconds: 0, isRunning: false });
+  if (now < state.phaseEndsAtMs) {
+    return {
+      state: {
+        ...state,
+        remainingSeconds: Math.max(
+          1,
+          Math.ceil((state.phaseEndsAtMs - now) / 1000),
+        ),
+      },
+      phaseCompleted: null,
+    };
+  }
+
+  return completeCurrentPhase({
+    ...state,
+    remainingSeconds: 0,
+    isRunning: false,
+    phaseEndsAtMs: null,
+  });
+}
+
+/** Reconcile a saved run with the current clock when a tab opens or syncs. */
+export function hydratePomodoroState(
+  state: PomodoroState,
+  now = Date.now(),
+): PhaseTransitionResult {
+  return tick(state, now);
 }
 
 /** Apply settings on the next phase; does not change the current countdown while running. */
@@ -144,5 +183,6 @@ export function updateSettings(
     ...state,
     settings,
     remainingSeconds: settings.focusSeconds,
+    phaseEndsAtMs: null,
   };
 }

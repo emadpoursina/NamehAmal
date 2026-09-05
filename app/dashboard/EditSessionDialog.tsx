@@ -91,7 +91,7 @@ export function EditSessionDialog({
 
     const tz = timeZone.trim();
     const startIso = ymdAndHmToUtcIsoInTimeZone(dateYmd, startTime.trim(), tz);
-    let endIso = ymdAndHmToUtcIsoInTimeZone(dateYmd, endTime.trim(), tz);
+    const endIso = ymdAndHmToUtcIsoInTimeZone(dateYmd, endTime.trim(), tz);
     if (!startIso || !endIso) return setError("Invalid date, time, or timezone.");
 
     let endMs = new Date(endIso).getTime();

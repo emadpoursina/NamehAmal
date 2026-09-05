@@ -66,7 +66,7 @@ function validateInputs(rootPath, runId, phase) {
   }
 }
 
-function validateFireProject(rootPath, runId) {
+function validateFireProject(rootPath) {
   const fireDir = path.join(rootPath, '.specs-fire');
   const statePath = path.join(fireDir, 'state.yaml');
 
@@ -137,7 +137,7 @@ function writeState(statePath, state) {
  */
 function updatePhase(rootPath, runId, phase) {
   validateInputs(rootPath, runId, phase);
-  const { statePath } = validateFireProject(rootPath, runId);
+  const { statePath } = validateFireProject(rootPath);
   const state = readState(statePath);
 
   // Find run in active runs list

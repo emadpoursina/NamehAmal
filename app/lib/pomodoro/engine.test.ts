@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   createInitialState,
+  hydratePomodoroState,
   skip,
   start,
   stop,
@@ -18,10 +19,13 @@ describe("pomodoro engine", () => {
   });
 
   it("starts from idle into focus", () => {
-    const running = start(createInitialState());
+    const running = start(createInitialState(), 1_000);
     expect(running.phase).toBe("focus");
     expect(running.isRunning).toBe(true);
     expect(running.remainingSeconds).toBe(DEFAULT_POMODORO_SETTINGS.focusSeconds);
+    expect(running.phaseEndsAtMs).toBe(
+      1_000 + DEFAULT_POMODORO_SETTINGS.focusSeconds * 1_000,
+    );
   });
 
   it("resumes a paused phase without resetting remaining time", () => {
@@ -29,11 +33,13 @@ describe("pomodoro engine", () => {
       ...createInitialState(),
       phase: "focus" as const,
       remainingSeconds: 120,
+      phaseEndsAtMs: null,
       isRunning: false,
     };
-    const running = start(paused);
+    const running = start(paused, 1_000);
     expect(running.remainingSeconds).toBe(120);
     expect(running.isRunning).toBe(true);
+    expect(running.phaseEndsAtMs).toBe(121_000);
   });
 
   it("stop cancels the run back to idle", () => {
@@ -42,6 +48,7 @@ describe("pomodoro engine", () => {
     expect(stopped.phase).toBe("idle");
     expect(stopped.isRunning).toBe(false);
     expect(stopped.completedFocusSessions).toBe(0);
+    expect(stopped.phaseEndsAtMs).toBeNull();
   });
 
   it("cycles focus to short rest after one focus session", () => {
@@ -103,13 +110,44 @@ describe("pomodoro engine", () => {
       ...createInitialState(),
       phase: "focus" as const,
       remainingSeconds: 1,
+      phaseEndsAtMs: 1_000,
       isRunning: true,
     };
 
-    const result = tick(state);
+    const result = tick(state, 1_000);
     expect(result.phaseCompleted).toBe("focus");
     expect(result.state.phase).toBe("short_rest");
     expect(result.state.isRunning).toBe(false);
+    expect(result.state.phaseEndsAtMs).toBeNull();
+  });
+
+  it("computes remaining time from the phase end time", () => {
+    const settings = {
+      ...DEFAULT_POMODORO_SETTINGS,
+      focusSeconds: 10,
+    };
+    const running = start(createInitialState(settings), 1_000);
+
+    const result = tick(running, 4_000);
+
+    expect(result.phaseCompleted).toBeNull();
+    expect(result.state.remainingSeconds).toBe(7);
+    expect(result.state.phaseEndsAtMs).toBe(11_000);
+  });
+
+  it("hydrates an overdue run by completing one phase and stopping", () => {
+    const settings = {
+      ...DEFAULT_POMODORO_SETTINGS,
+      focusSeconds: 10,
+    };
+    const running = start(createInitialState(settings), 1_000);
+
+    const result = hydratePomodoroState(running, 11_000);
+
+    expect(result.phaseCompleted).toBe("focus");
+    expect(result.state.phase).toBe("short_rest");
+    expect(result.state.isRunning).toBe(false);
+    expect(result.state.phaseEndsAtMs).toBeNull();
   });
 
   it("defers settings changes while a phase is running", () => {

@@ -119,7 +119,7 @@ function parseFrontmatter(content) {
     const frontmatter = yaml.parse(match[1]);
     const body = content.slice(match[0].length);
     return { frontmatter, body };
-  } catch (err) {
+  } catch {
     return null;
   }
 }
@@ -702,19 +702,19 @@ function parseArgs(args) {
     } else if (arg.startsWith('--files-created=')) {
       try {
         result.filesCreated = JSON.parse(arg.substring('--files-created='.length));
-      } catch (e) {
+      } catch {
         console.error('Warning: Could not parse --files-created JSON');
       }
     } else if (arg.startsWith('--files-modified=')) {
       try {
         result.filesModified = JSON.parse(arg.substring('--files-modified='.length));
-      } catch (e) {
+      } catch {
         console.error('Warning: Could not parse --files-modified JSON');
       }
     } else if (arg.startsWith('--decisions=')) {
       try {
         result.decisions = JSON.parse(arg.substring('--decisions='.length));
-      } catch (e) {
+      } catch {
         console.error('Warning: Could not parse --decisions JSON');
       }
     } else if (arg.startsWith('--tests=')) {

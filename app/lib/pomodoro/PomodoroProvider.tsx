@@ -7,22 +7,35 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import {
   createInitialState,
+  hydratePomodoroState,
   skip,
   start,
   stop,
   tick,
   updateSettings,
 } from "./engine";
-import { loadPomodoroSettings, savePomodoroSettings } from "./storage";
+import {
+  loadPomodoroRun,
+  loadPomodoroSettings,
+  RUN_KEY,
+  savePomodoroRun,
+  savePomodoroSettings,
+} from "./storage";
 import type { ActivePomodoroPhase, PomodoroPhase, PomodoroSettings, PomodoroState } from "./types";
 import { PomodoroPhaseAlert } from "./PomodoroPhaseAlert";
 
+const subscribeToHydration = () => () => {};
+const getHydratedSnapshot = () => true;
+const getServerHydratedSnapshot = () => false;
+
 type PomodoroContextValue = {
   state: PomodoroState;
+  isHydrated: boolean;
   start: () => void;
   stop: () => void;
   skip: () => void;
@@ -34,9 +47,30 @@ type PomodoroContextValue = {
 
 export const PomodoroContext = createContext<PomodoroContextValue | null>(null);
 
+type InitialPomodoroState = {
+  state: PomodoroState;
+  phaseCompleted: ActivePomodoroPhase | null;
+};
+
 export function PomodoroProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<PomodoroState>(() =>
-    createInitialState(loadPomodoroSettings()),
+  const isHydrated = useSyncExternalStore(
+    subscribeToHydration,
+    getHydratedSnapshot,
+    getServerHydratedSnapshot,
+  );
+  const [initialState] = useState<InitialPomodoroState>(() => {
+    const settings = loadPomodoroSettings();
+    const loaded = loadPomodoroRun(settings);
+    return hydratePomodoroState(loaded, Date.now());
+  });
+  const [state, setState] = useState<PomodoroState>(initialState.state);
+  const initialPhaseCompletion = useRef(
+    initialState.phaseCompleted
+      ? {
+          completedPhase: initialState.phaseCompleted,
+          nextPhase: initialState.state.phase,
+        }
+      : null,
   );
   const phaseCompleteListeners = useRef(
     new Set<(phase: ActivePomodoroPhase, nextPhase: PomodoroPhase) => void>(),
@@ -46,6 +80,10 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     savePomodoroSettings(state.settings);
   }, [state.settings]);
 
+  useEffect(() => {
+    savePomodoroRun(state);
+  }, [state]);
+
   const emitPhaseComplete = useCallback(
     (phase: ActivePomodoroPhase, nextPhase: PomodoroPhase) => {
       for (const fn of phaseCompleteListeners.current) fn(phase, nextPhase);
@@ -54,11 +92,21 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
+    const completion = initialPhaseCompletion.current;
+    if (!completion) return;
+
+    initialPhaseCompletion.current = null;
+    queueMicrotask(() =>
+      emitPhaseComplete(completion.completedPhase, completion.nextPhase),
+    );
+  }, [emitPhaseComplete]);
+
+  useEffect(() => {
     if (!state.isRunning) return;
 
     const id = window.setInterval(() => {
       setState((current) => {
-        const result = tick(current);
+        const result = tick(current, Date.now());
         if (result.phaseCompleted) {
           queueMicrotask(() =>
             emitPhaseComplete(result.phaseCompleted!, result.state.phase),
@@ -71,12 +119,38 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     return () => window.clearInterval(id);
   }, [state.isRunning, emitPhaseComplete]);
 
+  useEffect(() => {
+    function handleStorage(event: StorageEvent) {
+      if (event.key !== RUN_KEY) return;
+
+      const settings = loadPomodoroSettings();
+      const incoming = event.newValue
+        ? loadPomodoroRun(settings)
+        : createInitialState(settings);
+      const result = hydratePomodoroState(incoming, Date.now());
+
+      if (result.phaseCompleted) {
+        queueMicrotask(() =>
+          emitPhaseComplete(result.phaseCompleted!, result.state.phase),
+        );
+      }
+      setState(result.state);
+    }
+
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, [emitPhaseComplete]);
+
   const handleStart = useCallback(() => {
-    setState((current) => start(current));
+    setState((current) => {
+      return start(current);
+    });
   }, []);
 
   const handleStop = useCallback(() => {
-    setState((current) => stop(current));
+    setState((current) => {
+      return stop(current);
+    });
   }, []);
 
   const handleSkip = useCallback(() => {
@@ -108,6 +182,7 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       state,
+      isHydrated,
       start: handleStart,
       stop: handleStop,
       skip: handleSkip,
@@ -116,6 +191,7 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     }),
     [
       state,
+      isHydrated,
       handleStart,
       handleStop,
       handleSkip,

@@ -24,9 +24,19 @@ function settingsToFormValues(settings: {
 }
 
 export function PomodoroView() {
-  const { state, start, stop, skip, updateSettings } = usePomodoro();
+  const { state, isHydrated, start, stop, skip, updateSettings } = usePomodoro();
   const [form, setForm] = useState(() => settingsToFormValues(state.settings));
   const [savedAt, setSavedAt] = useState<number | null>(null);
+
+  if (!isHydrated) {
+    return (
+      <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-black">
+        <div className="text-center text-sm text-zinc-500 dark:text-zinc-400">
+          Loading Pomodoro…
+        </div>
+      </div>
+    );
+  }
 
   function onSubmitSettings(e: FormEvent) {
     e.preventDefault();
