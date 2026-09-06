@@ -55,6 +55,7 @@ export function parsePomodoroSettings(raw: unknown): PomodoroSettings {
       raw.longRestInterval,
       DEFAULT_POMODORO_SETTINGS.longRestInterval,
     ),
+    notifyOnPhaseComplete: raw.notifyOnPhaseComplete === true,
   };
 }
 

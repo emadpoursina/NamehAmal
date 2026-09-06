@@ -24,9 +24,20 @@ function settingsToFormValues(settings: {
 }
 
 export function PomodoroView() {
-  const { state, isHydrated, start, stop, skip, updateSettings } = usePomodoro();
+  const {
+    state,
+    isHydrated,
+    start,
+    stop,
+    skip,
+    updateSettings,
+    notificationStatus,
+    requestNotificationPermission,
+  } = usePomodoro();
   const [form, setForm] = useState(() => settingsToFormValues(state.settings));
   const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [notificationRequestPending, setNotificationRequestPending] =
+    useState(false);
 
   if (!isHydrated) {
     return (
@@ -68,8 +79,31 @@ export function PomodoroView() {
     setSavedAt(Date.now());
   }
 
+  async function onNotificationToggle() {
+    if (state.settings.notifyOnPhaseComplete) {
+      updateSettings({ notifyOnPhaseComplete: false });
+      return;
+    }
+
+    updateSettings({ notifyOnPhaseComplete: true });
+    setNotificationRequestPending(true);
+    try {
+      await requestNotificationPermission();
+    } finally {
+      setNotificationRequestPending(false);
+    }
+  }
+
   const isIdle = state.phase === "idle";
   const isRunning = state.isRunning;
+  const notificationMessage =
+    notificationStatus === "unsupported"
+      ? "Browser alerts are not available. The in-page alert and sound still work."
+      : notificationStatus === "denied" || notificationStatus === "error"
+        ? "Browser alerts are blocked. The in-page alert and sound still work."
+        : state.settings.notifyOnPhaseComplete && notificationStatus !== "granted"
+          ? "Allow browser alerts to receive phase-end notices in another tab."
+          : null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -123,6 +157,31 @@ export function PomodoroView() {
           Changes apply to the next phase. Defaults: 25 min focus, 5 min short rest, 15 min long
           rest, long rest every 4 focus sessions.
         </p>
+
+        <div className="mt-4 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+          <label className="flex items-start gap-3 text-sm">
+            <input
+              type="checkbox"
+              checked={state.settings.notifyOnPhaseComplete}
+              onChange={() => void onNotificationToggle()}
+              disabled={notificationRequestPending}
+              className="mt-0.5 size-4 accent-zinc-900 dark:accent-zinc-100"
+            />
+            <span className="flex flex-col gap-1">
+              <span className="font-medium text-zinc-900 dark:text-zinc-50">
+                Notify me when a phase ends, even in another tab
+              </span>
+              <span className="text-zinc-600 dark:text-zinc-400">
+                Browser alerts appear only when this tab is in the background.
+              </span>
+            </span>
+          </label>
+          {notificationMessage ? (
+            <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400" role="status">
+              {notificationMessage}
+            </p>
+          ) : null}
+        </div>
 
         <form onSubmit={onSubmitSettings} className="mt-4 flex flex-col gap-4">
           <div className="grid gap-4 sm:grid-cols-2">

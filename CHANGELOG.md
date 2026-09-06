@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.7] - 2026-09-06
+### Added
+- Optional Pomodoro browser notifications for phase completions while the app is in another tab, with local persistence and click-to-focus behavior.
+
+## [0.1.6] - 2026-09-06
+### Added
+- FIRE plan for Pomodoro background notifications: when a phase ends, the user can get a system notice even if they are in another tab.
+
 ## [0.1.5] - 2026-09-05
 ### Fixed
 - Cleared all remaining repository lint errors and warnings.

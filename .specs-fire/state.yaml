@@ -13,6 +13,18 @@ workspace:
   scanned_at: 2026-07-15T03:21:00Z
   parts: []
 intents:
+  - id: pomodoro-background-notify
+    title: Pomodoro Background Notifications
+    status: in_progress
+    work_items:
+      - id: pomodoro-tab-notifications
+        title: Pomodoro Tab Notifications
+        status: completed
+        complexity: medium
+        mode: confirm
+        depends_on: []
+        run_id: run-workspace-001
+        completed_at: 2026-09-06T11:08:21.328Z
   - id: pomodoro-timer
     title: Pomodoro Timer
     status: in_progress
@@ -182,3 +194,11 @@ runs:
           mode: confirm
       started: 2026-07-23T12:52:31.398Z
       completed: 2026-07-23T12:53:11.859Z
+    - id: run-workspace-001
+      scope: single
+      work_items:
+        - id: pomodoro-tab-notifications
+          intent: pomodoro-background-notify
+          mode: confirm
+      started: 2026-09-06T11:04:07.030Z
+      completed: 2026-09-06T11:08:21.328Z
