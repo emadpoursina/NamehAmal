@@ -1,8 +1,9 @@
 ---
 id: pomodoro-background-notify
 title: Pomodoro Background Notifications
-status: in_progress
+status: completed
 created: 2026-09-06T10:59:00Z
+completed_at: 2026-09-06T11:08:21.337Z
 ---
 
 # Intent: Pomodoro Background Notifications
