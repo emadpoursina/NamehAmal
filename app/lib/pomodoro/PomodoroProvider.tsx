@@ -26,8 +26,19 @@ import {
   savePomodoroRun,
   savePomodoroSettings,
 } from "./storage";
-import type { ActivePomodoroPhase, PomodoroPhase, PomodoroSettings, PomodoroState } from "./types";
+import {
+  getPomodoroNotificationStatus,
+  requestPomodoroNotificationPermission,
+} from "./notifications";
+import type {
+  ActivePomodoroPhase,
+  PomodoroNotificationStatus,
+  PomodoroPhase,
+  PomodoroSettings,
+  PomodoroState,
+} from "./types";
 import { PomodoroPhaseAlert } from "./PomodoroPhaseAlert";
+import { PomodoroPhaseNotification } from "./PomodoroPhaseNotification";
 
 const subscribeToHydration = () => () => {};
 const getHydratedSnapshot = () => true;
@@ -40,6 +51,9 @@ type PomodoroContextValue = {
   stop: () => void;
   skip: () => void;
   updateSettings: (partial: Partial<PomodoroSettings>) => void;
+  notificationStatus: PomodoroNotificationStatus;
+  requestNotificationPermission: () => Promise<PomodoroNotificationStatus>;
+  reportNotificationFailure: () => void;
   subscribePhaseComplete: (
     fn: (phase: ActivePomodoroPhase, nextPhase: PomodoroPhase) => void,
   ) => () => void;
@@ -64,6 +78,8 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     return hydratePomodoroState(loaded, Date.now());
   });
   const [state, setState] = useState<PomodoroState>(initialState.state);
+  const [notificationStatus, setNotificationStatus] =
+    useState<PomodoroNotificationStatus>(() => getPomodoroNotificationStatus());
   const initialPhaseCompletion = useRef(
     initialState.phaseCompleted
       ? {
@@ -169,6 +185,16 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     setState((current) => updateSettings(current, partial));
   }, []);
 
+  const handleRequestNotificationPermission = useCallback(async () => {
+    const status = await requestPomodoroNotificationPermission();
+    setNotificationStatus(status);
+    return status;
+  }, []);
+
+  const reportNotificationFailure = useCallback(() => {
+    setNotificationStatus("error");
+  }, []);
+
   const subscribePhaseComplete = useCallback(
     (fn: (phase: ActivePomodoroPhase, nextPhase: PomodoroPhase) => void) => {
       phaseCompleteListeners.current.add(fn);
@@ -187,6 +213,9 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
       stop: handleStop,
       skip: handleSkip,
       updateSettings: handleUpdateSettings,
+      notificationStatus,
+      requestNotificationPermission: handleRequestNotificationPermission,
+      reportNotificationFailure,
       subscribePhaseComplete,
     }),
     [
@@ -196,12 +225,16 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
       handleStop,
       handleSkip,
       handleUpdateSettings,
+      notificationStatus,
+      handleRequestNotificationPermission,
+      reportNotificationFailure,
       subscribePhaseComplete,
     ],
   );
 
   return (
     <PomodoroContext.Provider value={value}>
+      <PomodoroPhaseNotification />
       <PomodoroPhaseAlert />
       {children}
     </PomodoroContext.Provider>

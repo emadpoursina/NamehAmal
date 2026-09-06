@@ -132,7 +132,19 @@ intents:
         run_id: run-nameh-amal-002
         completed_at: 2026-07-15T17:20:13.925Z
 runs:
-  active: []
+  active:
+    - id: run-workspace-001
+      scope: single
+      work_items:
+        - id: pomodoro-tab-notifications
+          intent: pomodoro-background-notify
+          mode: confirm
+          status: in_progress
+          current_phase: execute
+          checkpoint_state: approved
+          current_checkpoint: plan
+      current_item: pomodoro-tab-notifications
+      started: 2026-09-06T11:04:07.030Z
   completed:
     - id: run-nameh-amal-001
       scope: batch
