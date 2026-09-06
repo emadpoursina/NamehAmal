@@ -140,7 +140,7 @@ runs:
           intent: pomodoro-background-notify
           mode: confirm
           status: in_progress
-          current_phase: execute
+          current_phase: test
           checkpoint_state: approved
           current_checkpoint: plan
       current_item: pomodoro-tab-notifications
