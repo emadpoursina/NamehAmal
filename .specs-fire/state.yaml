@@ -13,6 +13,16 @@ workspace:
   scanned_at: 2026-07-15T03:21:00Z
   parts: []
 intents:
+  - id: pomodoro-background-notify
+    title: Pomodoro Background Notifications
+    status: in_progress
+    work_items:
+      - id: pomodoro-tab-notifications
+        title: Pomodoro Tab Notifications
+        status: pending
+        complexity: medium
+        mode: confirm
+        depends_on: []
   - id: pomodoro-timer
     title: Pomodoro Timer
     status: in_progress
