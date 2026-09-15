@@ -54,6 +54,34 @@ bun run dev
 
 Open `http://localhost:3060`.
 
+## macOS desktop app
+
+The Electron desktop build keeps the existing web app and local SQLite
+workflows, but opens the dashboard in its own macOS window. Core workflows
+work offline and do not require a separate browser or server command.
+
+Prerequisites:
+
+- Node.js 24 LTS
+- npm dependencies installed
+- Xcode Command Line Tools for the native SQLite module
+
+Run the desktop app locally:
+
+```bash
+npm run desktop:dev
+```
+
+Build an architecture-specific DMG and ZIP:
+
+```bash
+npm run desktop:dist -- --mac --arm64
+npm run desktop:dist -- --mac --x64
+```
+
+See [docs/desktop-macos.md](docs/desktop-macos.md) for installation,
+data-location, web-to-desktop migration, recovery, and signing details.
+
 ## Docker
 
 Production image (Next.js standalone + SQLite volume). Listens on **3060**, same as local `bun run start`, so an existing reverse proxy to that port (e.g. `http://nml.localhost/` → `127.0.0.1:3060`) keeps working.

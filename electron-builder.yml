@@ -1,0 +1,36 @@
+appId: com.namehamal.desktop
+productName: NamehAmal
+asar: true
+npmRebuild: false
+directories:
+  output: release
+  buildResources: build
+files:
+  - .electron-dist/**/*
+extraResources:
+  - from: .desktop-runtime/standalone/node_modules
+    to: desktop-runtime/standalone/node_modules
+  - from: .desktop-runtime/standalone
+    to: desktop-runtime/standalone
+  - from: .desktop-runtime/prisma
+    to: desktop-runtime/prisma
+  - from: .desktop-runtime/prisma.config.ts
+    to: desktop-runtime/prisma.config.ts
+  - from: .desktop-runtime/manifest.json
+    to: desktop-runtime/manifest.json
+  - from: .desktop-runtime/node_modules
+    to: desktop-runtime/node_modules
+asarUnpack:
+  - "**/*.node"
+  - "**/better-sqlite3/**"
+  - "**/@prisma/engines/**"
+mac:
+  category: public.app-category.productivity
+  target:
+    - dmg
+    - zip
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+artifactName: "${productName}-${version}-${arch}.${ext}"
