@@ -1,3 +1,4 @@
+import type { ChildProcess } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -72,7 +73,7 @@ describe("desktop server process", () => {
       },
       spawnProcess: () => {
         calls.push("spawn");
-        return child;
+        return child as unknown as ChildProcess;
       },
       fetcher: async () => ({ ok: true, status: 200 }),
       isPortOccupied: async () => false,
@@ -107,7 +108,7 @@ describe("desktop server process", () => {
       },
       spawnProcess: () => {
         launched = true;
-        return createFakeChild();
+        return createFakeChild() as unknown as ChildProcess;
       },
     });
 
@@ -146,7 +147,7 @@ describe("desktop server process", () => {
       runCommand: successfulMigration,
       spawnProcess: () => {
         launched = true;
-        return createFakeChild();
+        return createFakeChild() as unknown as ChildProcess;
       },
       isPortOccupied: async () => true,
     });
@@ -164,7 +165,7 @@ describe("desktop server process", () => {
     const process = new ServerProcess({
       config,
       runCommand: successfulMigration,
-      spawnProcess: () => child,
+      spawnProcess: () => child as unknown as ChildProcess,
       fetcher: async () => {
         child.exitCode = 1;
         child.emit("exit", 1, null);
@@ -184,7 +185,7 @@ describe("desktop server process", () => {
     const process = new ServerProcess({
       config,
       runCommand: successfulMigration,
-      spawnProcess: () => createFakeChild(),
+      spawnProcess: () => createFakeChild() as unknown as ChildProcess,
       fetcher: async () => ({ ok: true, status: 200 }),
       isPortOccupied: async () => false,
     });
@@ -205,7 +206,7 @@ describe("desktop server process", () => {
       startupTimeoutMs: 5,
       readinessIntervalMs: 1,
       runCommand: successfulMigration,
-      spawnProcess: () => child,
+      spawnProcess: () => child as unknown as ChildProcess,
       fetcher: async () => ({ ok: false, status: 503 }),
       sleep: async () => undefined,
       isPortOccupied: async () => false,
@@ -224,7 +225,7 @@ describe("desktop server process", () => {
       config,
       shutdownTimeoutMs: 1,
       runCommand: successfulMigration,
-      spawnProcess: () => child,
+      spawnProcess: () => child as unknown as ChildProcess,
       fetcher: async () => ({ ok: true, status: 200 }),
       isPortOccupied: async () => false,
     });

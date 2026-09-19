@@ -46,7 +46,10 @@ describe("desktop runtime configuration", () => {
       projectRoot: "/tmp/nameh-amal",
       profileDirectory: "/tmp/nameh-amal-test-profile",
     });
-    const environment = buildServerEnvironment(config, { CUSTOM: "value" });
+    const environment = buildServerEnvironment(config, {
+      ...process.env,
+      CUSTOM: "value",
+    });
 
     expect(config.databasePath).toBe(
       "/tmp/nameh-amal-test-profile/nameh-amal.db",

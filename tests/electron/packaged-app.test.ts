@@ -301,7 +301,9 @@ packagedTests("packaged desktop runtime", () => {
       try {
         const settings = await requestJson(origin, "/api/settings");
         expect(settings.response.ok).toBe(true);
-        expect(settings.body.data.timeZone).toBe("Asia/Yerevan");
+        expect(
+          (settings.body.data as { timeZone: string }).timeZone,
+        ).toBe("Asia/Yerevan");
 
         const work = await requestJson(origin, "/api/categories", {
           method: "POST",
