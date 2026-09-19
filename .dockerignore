@@ -64,8 +64,7 @@ docker-compose*.yml
 *.md
 docs/
 .cursor/
-.specs-fire/
-.specsmd/
+.specify/
 AGENTS.md
 CLAUDE.md
 .DS_Store
