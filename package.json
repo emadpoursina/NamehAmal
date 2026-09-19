@@ -21,12 +21,12 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@prisma/adapter-better-sqlite3": "^7.8.0",
-    "@prisma/client": "^7.8.0",
+    "@prisma/adapter-better-sqlite3": "^7.10.0",
+    "@prisma/client": "^7.10.0",
     "better-sqlite3": "^12.11.1",
     "dotenv": "^17.4.2",
-    "next": "16.2.4",
-    "prisma": "^7.8.0",
+    "next": "16.3.5",
+    "prisma": "^7.10.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "yaml": "^2.9.0"
@@ -41,11 +41,11 @@
     "electron": "44.3.0",
     "electron-builder": "26.15.3",
     "eslint": "^9",
-    "eslint-config-next": "16.2.4",
+    "eslint-config-next": "16.3.5",
     "tailwindcss": "^4",
-    "tsx": "^4.21.0",
+    "tsx": "^4.23.13",
     "typescript": "^6.0.3",
-    "vitest": "^3.2.4"
+    "vitest": "^5.0.1"
   },
   "ignoreScripts": [
     "sharp",
@@ -54,5 +54,9 @@
   "trustedDependencies": [
     "sharp",
     "unrs-resolver"
-  ]
+  ],
+  "overrides": {
+    "mysql2": "^3.24.4",
+    "deepmerge-ts": "^8.0.2"
+  }
 }
