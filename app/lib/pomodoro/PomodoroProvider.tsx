@@ -170,16 +170,8 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const handleSkip = useCallback(() => {
-    setState((current) => {
-      const result = skip(current);
-      if (result.phaseCompleted) {
-        queueMicrotask(() =>
-          emitPhaseComplete(result.phaseCompleted!, result.state.phase),
-        );
-      }
-      return result.state;
-    });
-  }, [emitPhaseComplete]);
+    setState((current) => skip(current).state);
+  }, []);
 
   const handleUpdateSettings = useCallback((partial: Partial<PomodoroSettings>) => {
     setState((current) => updateSettings(current, partial));

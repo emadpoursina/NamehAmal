@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.6] - 2026-09-16
+### Added
+- Added activity check-in to the Pomodoro phase-complete popup: when a phase
+  ends naturally, the app asks whether the currently recorded activity is
+  still ongoing and offers to start or switch the tracked activity inline.
+  Skip and Stop no longer trigger the popup.
+
 ## [0.2.5] - 2026-09-14
 ### Fixed
 - Fixed packaged macOS startup by materializing Next.js traced native-module

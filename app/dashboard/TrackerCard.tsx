@@ -2,79 +2,20 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { CategoryModel, SessionModel } from "@/app/generated/prisma/models";
+import type { CategoryModel } from "@/app/generated/prisma/models";
 import { ActivityCombobox, type ActivitySelection } from "@/app/components/ActivityCombobox";
 import { subscribeActiveTimerRefresh } from "@/app/dashboard/active-timer-refresh-bus";
 import { formatDuration } from "@/app/dashboard/format";
 import { toActivitySelection } from "@/app/lib/use-activities";
+import {
+  fetchActiveTimer,
+  fetchDefaultTimeZone,
+  startTimer,
+  stopTimer,
+  type SessionWithCategory,
+} from "@/app/lib/tracker-client";
 import { ymdAndHmToUtcIsoInTimeZone } from "@/app/lib/timezone";
 import { ActivityFormDialog } from "@/app/settings/ActivityFormDialog";
-
-type SessionWithCategory = SessionModel & { category: CategoryModel };
-
-type SettingsResponse =
-  | { ok: true; data: { id: string; timeZone: string } }
-  | { ok: false; error: string };
-
-// Fetch the currently active timer session (if any).
-async function fetchActiveTimer(): Promise<SessionWithCategory | null> {
-  const res = await fetch("/api/tracker", { cache: "no-store" });
-  const json = (await res.json()) as {
-    ok: boolean;
-    data: SessionWithCategory | null;
-    error?: string;
-  };
-  if (!res.ok || !json.ok) {
-    throw new Error(json.error || `Failed to fetch active timer (${res.status}).`);
-  }
-  return json.data ?? null;
-}
-
-// Fetch the app's default timezone setting.
-async function fetchDefaultTimeZone(): Promise<string> {
-  const res = await fetch("/api/settings", { cache: "no-store" });
-  const json = (await res.json()) as SettingsResponse;
-  if (!res.ok || !json.ok) {
-    throw new Error(!json.ok ? json.error : `Failed to load settings (${res.status}).`);
-  }
-  return json.data.timeZone || "Asia/Yerevan";
-}
-
-// Start a new timer session (optional `startedAt` ISO for backdated start).
-async function startTimer(payload: {
-  categoryId: string;
-  title: string | null;
-  timeZone: string;
-  startedAt?: string;
-}) {
-  const res = await fetch("/api/tracker", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ action: "start", ...payload }),
-  });
-  const json = (await res.json()) as {
-    ok: boolean;
-    data?: SessionWithCategory;
-    error?: string;
-  };
-  if (!res.ok || !json.ok || !json.data) {
-    throw new Error(json.error || `Failed to start timer (${res.status}).`);
-  }
-  return json.data;
-}
-
-// Stop the currently running timer session.
-async function stopTimer(sessionId: string) {
-  const res = await fetch("/api/tracker", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ action: "stop", sessionId }),
-  });
-  const json = (await res.json()) as { ok: boolean; error?: string };
-  if (!res.ok || !json.ok) {
-    throw new Error(json.error || `Failed to stop timer (${res.status}).`);
-  }
-}
 
 // Render the live tracking card (start/stop + elapsed time).
 export function TrackerCard({
