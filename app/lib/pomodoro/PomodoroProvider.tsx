@@ -19,6 +19,8 @@ import {
   tick,
   updateSettings,
 } from "./engine";
+import { getDesktopApi } from "./desktop-transport";
+import type { NamehAmalDesktop } from "@/electron/ipc-channels";
 import {
   loadPomodoroRun,
   loadPomodoroSettings,
@@ -73,6 +75,11 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     getServerHydratedSnapshot,
   );
   const [initialState] = useState<InitialPomodoroState>(() => {
+    // Desktop build: the main process owns the state (D1/D6); the renderer
+    // starts from defaults and syncs over IPC. No localStorage access.
+    if (getDesktopApi() !== null) {
+      return { state: createInitialState(), phaseCompleted: null };
+    }
     const settings = loadPomodoroSettings();
     const loaded = loadPomodoroRun(settings);
     return hydratePomodoroState(loaded, Date.now());
@@ -93,10 +100,12 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
+    if (getDesktopApi() !== null) return; // main process owns persistence (D6)
     savePomodoroSettings(state.settings);
   }, [state.settings]);
 
   useEffect(() => {
+    if (getDesktopApi() !== null) return; // main process owns persistence (D6)
     savePomodoroRun(state);
   }, [state]);
 
@@ -118,6 +127,7 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
   }, [emitPhaseComplete]);
 
   useEffect(() => {
+    if (getDesktopApi() !== null) return; // main process ticks and pushes (D6)
     if (!state.isRunning) return;
 
     const id = window.setInterval(() => {
@@ -136,6 +146,7 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
   }, [state.isRunning, emitPhaseComplete]);
 
   useEffect(() => {
+    if (getDesktopApi() !== null) return; // desktop uses IPC, not localStorage (D6)
     function handleStorage(event: StorageEvent) {
       if (event.key !== RUN_KEY) return;
 
@@ -157,23 +168,85 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("storage", handleStorage);
   }, [emitPhaseComplete]);
 
+  // Desktop transport: subscribe first (last snapshot wins), then fetch once.
+  useEffect(() => {
+    const api: NamehAmalDesktop | null = getDesktopApi();
+    if (api === null) return;
+    let cancelled = false;
+    const unsubscribe = api.onPomodoroStateChanged((snapshot) => {
+      if (!cancelled) {
+        setState(snapshot.state);
+      }
+    });
+    api
+      .getPomodoroState()
+      .then((snapshot) => {
+        if (!cancelled) {
+          setState(snapshot.state);
+        }
+      })
+      .catch(() => {
+        // Keep defaults until the next push; never crash the renderer.
+      });
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, []);
+
+  // Desktop: derive phase-complete events from pushed phase transitions.
+  const previousPhaseRef = useRef<PomodoroPhase>(initialState.state.phase);
+  useEffect(() => {
+    if (getDesktopApi() === null) return;
+    const previousPhase = previousPhaseRef.current;
+    previousPhaseRef.current = state.phase;
+    if (previousPhase !== "idle" && state.phase !== previousPhase) {
+      queueMicrotask(() =>
+        emitPhaseComplete(
+          previousPhase as ActivePomodoroPhase,
+          state.phase,
+        ),
+      );
+    }
+  }, [state.phase, emitPhaseComplete]);
+
   const handleStart = useCallback(() => {
+    const api = getDesktopApi();
+    if (api) {
+      void api.startPomodoro().then((next) => setState(next));
+      return;
+    }
     setState((current) => {
       return start(current);
     });
   }, []);
 
   const handleStop = useCallback(() => {
+    const api = getDesktopApi();
+    if (api) {
+      void api.stopPomodoro().then((next) => setState(next));
+      return;
+    }
     setState((current) => {
       return stop(current);
     });
   }, []);
 
   const handleSkip = useCallback(() => {
+    const api = getDesktopApi();
+    if (api) {
+      void api.skipPomodoro().then((next) => setState(next));
+      return;
+    }
     setState((current) => skip(current).state);
   }, []);
 
   const handleUpdateSettings = useCallback((partial: Partial<PomodoroSettings>) => {
+    const api = getDesktopApi();
+    if (api) {
+      void api.updatePomodoroSettings(partial).then((next) => setState(next));
+      return;
+    }
     setState((current) => updateSettings(current, partial));
   }, []);
 

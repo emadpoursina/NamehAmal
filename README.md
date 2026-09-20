@@ -60,6 +60,32 @@ The Electron desktop build keeps the existing web app and local SQLite
 workflows, but opens the dashboard in its own macOS window. Core workflows
 work offline and do not require a separate browser or server command.
 
+### Menu bar pomodoro (macOS)
+
+The desktop app lives in the macOS menu bar:
+
+- Closing the main window hides it to the menu bar (the Dock icon disappears;
+  the app keeps running). **Open App** and **Quit App** are available from the
+  menu bar item; Quit fully exits and stops the embedded server.
+- The menu bar item shows a live `MM:SS` countdown plus the recorded activity
+  name while a pomodoro runs (single authority: the Electron main process),
+  and an idle `×` glyph with no countdown otherwise. The in-app timer and the
+  menu bar never diverge.
+- **Start Pomodoro / Resume / Stop** work directly from the menu bar. A
+  menu-bar start records the activity currently selected in the app's tracker
+  (no picker); stopping finalizes that tracker draft into a `Session`.
+- Idle reminders: every 5 idle minutes a dismissible macOS notification
+  banner reminds you to start a pomodoro (never shown while a timer runs).
+  Toggle **"Remind me to start a pomodoro"** in the menu; the setting
+  persists.
+- Desktop runtime state (timer snapshot, settings, selected activity,
+  reminder toggle) is stored in `userData/pomodoro.json`; a running timer is
+  re-hydrated from its wall-clock end time on relaunch, and closing the
+  window never finalizes or discards an in-progress timer.
+
+The web/self-hosted build is unchanged: without the Electron shell the
+pomodoro keeps using localStorage and none of the IPC/tray code activates.
+
 Prerequisites:
 
 - Node.js 24 LTS

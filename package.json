@@ -1,10 +1,10 @@
 {
   "name": "nameh-amal",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "Local-first time tracking app",
   "author": "NamehAmal",
   "private": true,
-  "main": ".electron-dist/main.js",
+  "main": ".electron-dist/electron/main.js",
   "scripts": {
     "dev": "PORT=3060 next dev --webpack",
     "dev:turbo": "next dev",

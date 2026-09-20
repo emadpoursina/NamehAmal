@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.7] - 2026-09-20
+### Added
+- Added a macOS menu bar extra for the desktop app: live pomodoro countdown
+  and activity name, Start/Resume/Stop plus Open App and Quit, hide-to-tray
+  on window close (Dock icon hidden, app stays running), and a 5-minute idle
+  reminder banner with a persisted on/off toggle. Tracker drafts bind only
+  when Start comes from the menu bar.
+
 ## [0.2.6] - 2026-09-16
 ### Added
 - Added activity check-in to the Pomodoro phase-complete popup: when a phase

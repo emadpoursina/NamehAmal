@@ -7,6 +7,9 @@ directories:
   buildResources: build
 files:
   - .electron-dist/**/*
+  # FR-007 (T035): tray glyphs ship inside the asar so the menu-bar item shows
+  # the idle `×` / running glyph in packaged builds, not just `desktop:dev`.
+  - electron/assets/**/*
 extraResources:
   - from: .desktop-runtime/standalone/node_modules
     to: desktop-runtime/standalone/node_modules

@@ -85,6 +85,22 @@ export function TrackerCard({
     };
   }, [active?.startedAt]);
 
+  // Desktop only (FR-008): report the tracker selection so menu-bar Start can
+  // record the app's currently selected activity without any picker. No-op on
+  // the web/browser build.
+  useEffect(() => {
+    const api = window.namehAmalDesktop;
+    if (!api || !categoryId) return;
+    void api
+      .reportSelectedActivity({
+        categoryId,
+        title: title.trim() ? title.trim() : null,
+      })
+      .catch(() => {
+        // Reporting failures are silent; the countdown path is unaffected.
+      });
+  }, [categoryId, title]);
+
   const elapsedSeconds = (() => {
     if (!active?.startedAt) return 0;
     const start = new Date(active.startedAt).getTime();
