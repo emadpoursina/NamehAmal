@@ -82,6 +82,22 @@ Developer ID credentials can opt in with
 `CSC_IDENTITY_AUTO_DISCOVERY=true` and its protected keychain/notarization
 settings.
 
+## Pomodoro (menu bar and in-app page)
+
+The macOS menu-bar pomodoro and the in-app `/pomodoro` page show and control
+the same single clock. The clock lives in the desktop main process and is
+persisted to `userData/pomodoro.json`; the page is a view and controller over
+that host clock — it never runs a second, independent countdown.
+
+- On launch (or refresh), the page shows a neutral "Waiting for desktop
+  host…" placeholder until the first host snapshot arrives; controls stay
+  disabled and no default durations are fabricated. Once connected, the page
+  mirrors the tray: same phase, remaining time, and activity label.
+- Settings changed in either surface apply to both for the next phase or
+  session. A change made mid-countdown never alters the countdown in progress.
+- The desktop store (`userData/pomodoro.json`) and the plain-browser
+  localStorage store stay fully independent; the two are never merged.
+
 ## Recovery messages
 
 - **Local data directory unavailable**: check that the application-data

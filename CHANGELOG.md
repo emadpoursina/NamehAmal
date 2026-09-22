@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.10] - 2026-09-22
+### Changed
+- The desktop Pomodoro page and the menu bar share one clock and one settings store. The page waits until the desktop host is ready instead of starting a second timer. Settings saved in a normal browser stay separate from the desktop app.
+### Added
+- The in-app countdown shows the same activity name as the menu bar.
+
 ## [0.2.9] - 2026-09-22
 ### Changed
 - Updated `AGENTS.md` to the Next.js 16.3.5 agent-rules block that `next dev` rewrites, and recorded how this Cloud Agent environment installs dependencies, runs the dev server, and runs tests.

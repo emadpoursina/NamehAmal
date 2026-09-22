@@ -127,6 +127,9 @@ export class PomodoroHost {
       state: this.state,
       selectedActivity: this.selectedActivity,
       reminderEnabled: this.reminderEnabled,
+      // FR-012/T022: deliver the same resolved label the Tray shows so the
+      // in-app countdown never diverges when the draft title is null.
+      activityName: this.getActivityName(),
     };
   }
 

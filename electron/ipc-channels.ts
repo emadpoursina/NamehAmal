@@ -32,6 +32,12 @@ export type PomodoroSnapshot = {
   state: PomodoroState;
   selectedActivity: SelectedActivityRef | null;
   reminderEnabled: boolean;
+  /**
+   * Host-resolved activity label (draft title → category name → "—"),
+   * identical to the string the Tray displays (FR-012, T022). Optional so
+   * legacy snapshot producers and test fixtures stay source-compatible.
+   */
+  activityName?: string;
 };
 
 /** Activity label shown next to the tray countdown (draft title → category name → "—"). */
