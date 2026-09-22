@@ -142,23 +142,51 @@ export class PomodoroHost {
    * the tray menu calls `start({ bindTracker: true })`, while the renderer IPC
    * `pomodoro:start` handler calls `start()` with no options and never posts
    * `/api/tracker` — the in-app UI manages its own tracker drafts directly.
+   *
+   * The state change is broadcast immediately; tracker HTTP (binding + label
+   * refresh) continues in the background and triggers a follow-up broadcast
+   * when it resolves, so the tray and renderer never wait on `/api/tracker`.
    */
   async start(options?: { bindTracker?: boolean }): Promise<PomodoroState> {
     const wasIdle = this.state.phase === "idle" && !this.state.isRunning;
     this.applyEngineState(start(this.state, this.now()));
-    if (wasIdle && options?.bindTracker === true) {
-      await this.bindTrackerDraft();
-    }
     this.persist();
     this.broadcastNow();
+    if (wasIdle && options?.bindTracker === true) {
+      void (async () => {
+        try {
+          await this.bindTrackerDraft();
+          await this.pollTracker();
+        } catch {
+          // Binding failures degrade gracefully; the countdown is unaffected.
+        }
+        if (!this.disposed) {
+          this.broadcastNow();
+        }
+      })();
+    }
     return this.state;
   }
 
+  /**
+   * Engine `stop()`: back to idle. The bound tracker draft (menu-bar start)
+   * is finalized in the background; the stop itself is broadcast immediately
+   * so every subscriber reflects it without waiting on `/api/tracker`.
+   */
   async stop(): Promise<PomodoroState> {
     this.applyEngineState(stop(this.state));
-    await this.finalizeBoundDraft();
     this.persist();
     this.broadcastNow();
+    void (async () => {
+      try {
+        await this.finalizeBoundDraft();
+      } catch {
+        // Finalize failures degrade gracefully; the pomodoro already stopped.
+      }
+      if (!this.disposed) {
+        this.broadcastNow();
+      }
+    })();
     return this.state;
   }
 
@@ -296,7 +324,7 @@ export class PomodoroHost {
     } catch {
       // Finalize failures degrade gracefully; the pomodoro still stops.
     }
-    void this.pollTracker();
+    await this.pollTracker();
   }
 
   /** Poll GET /api/tracker; any failure → fallback label, never a crash (D2). */

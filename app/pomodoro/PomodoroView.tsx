@@ -1,11 +1,12 @@
 "use client";
 
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import {
   formatPomodoroCountdown,
   minutesToSeconds,
   secondsToMinutes,
 } from "@/app/lib/pomodoro/format";
+import { isDesktopRuntime } from "@/app/lib/pomodoro/desktop-transport";
 import { PHASE_LABELS } from "@/app/lib/pomodoro/phase-labels";
 import { usePomodoro } from "@/app/lib/pomodoro/use-pomodoro";
 
@@ -27,10 +28,12 @@ export function PomodoroView() {
   const {
     state,
     isHydrated,
+    reminderEnabled,
     start,
     stop,
     skip,
     updateSettings,
+    updateReminderEnabled,
     notificationStatus,
     requestNotificationPermission,
   } = usePomodoro();
@@ -38,6 +41,22 @@ export function PomodoroView() {
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [notificationRequestPending, setNotificationRequestPending] =
     useState(false);
+
+  // The desktop host pushes a fresh snapshot object every second; only
+  // re-sync the form fields when the persisted setting values actually
+  // change (e.g. restored from another surface), never while typing.
+  const settingsSignature = [
+    state.settings.focusSeconds,
+    state.settings.shortRestSeconds,
+    state.settings.longRestSeconds,
+    state.settings.longRestInterval,
+  ].join(":");
+  const lastSyncedSignature = useRef(settingsSignature);
+  useEffect(() => {
+    if (lastSyncedSignature.current === settingsSignature) return;
+    lastSyncedSignature.current = settingsSignature;
+    setForm(settingsToFormValues(state.settings));
+  }, [settingsSignature, state.settings]);
 
   if (!isHydrated) {
     return (
@@ -182,6 +201,28 @@ export function PomodoroView() {
             </p>
           ) : null}
         </div>
+
+        {isDesktopRuntime() ? (
+          <div className="mt-4 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+            <label className="flex items-start gap-3 text-sm">
+              <input
+                type="checkbox"
+                checked={reminderEnabled}
+                onChange={(e) => updateReminderEnabled(e.target.checked)}
+                className="mt-0.5 size-4 accent-zinc-900 dark:accent-zinc-100"
+              />
+              <span className="flex flex-col gap-1">
+                <span className="font-medium text-zinc-900 dark:text-zinc-50">
+                  Remind me to start a pomodoro
+                </span>
+                <span className="text-zinc-600 dark:text-zinc-400">
+                  macOS notification banner every 5 idle minutes. Mirrors the
+                  menu bar toggle.
+                </span>
+              </span>
+            </label>
+          </div>
+        ) : null}
 
         <form onSubmit={onSubmitSettings} className="mt-4 flex flex-col gap-4">
           <div className="grid gap-4 sm:grid-cols-2">

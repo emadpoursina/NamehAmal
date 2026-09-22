@@ -15,6 +15,7 @@ import {
   type ActiveTrackerDraft,
   type TrackerClient,
 } from "../../electron/pomodoro-host";
+import type { PomodoroSnapshot } from "../../electron/ipc-channels";
 import { DEFAULT_POMODORO_SETTINGS } from "../../app/lib/pomodoro/types";
 import type { PomodoroState } from "../../app/lib/pomodoro/types";
 
@@ -31,7 +32,7 @@ afterEach(async () => {
 type HostHarness = {
   filePath: string;
   writer: DebouncedWriter;
-  broadcasts: { snapshot: unknown; activityName: string }[];
+  broadcasts: { snapshot: PomodoroSnapshot; activityName: string }[];
   tracker: {
     calls: { method: string; payload?: Record<string, unknown> }[];
     active: ActiveTrackerDraft | null;
@@ -444,6 +445,98 @@ describe("tracker binding (D3, T021/T022)", () => {
       title: "Deep work",
       reportedAt: expect.any(Number),
     });
+  });
+});
+
+describe("broadcast ordering (sync hardening)", () => {
+  it("broadcasts start before the tracker binding resolves", async () => {
+    const harness = await createHarness();
+    const now = 1_000_000;
+    let resolveStartDraft: (id: string | null) => void = () => {};
+    const startDraftPromise = new Promise<string | null>((resolve) => {
+      resolveStartDraft = resolve;
+    });
+    let startDraftCalls = 0;
+    const host = new PomodoroHost({
+      writer: harness.writer,
+      load: () => loadDesktopState(harness.filePath),
+      tracker: {
+        getActiveDraft: async () => null,
+        startDraft: async () => {
+          startDraftCalls += 1;
+          return startDraftPromise;
+        },
+        stopDraft: async () => true,
+      },
+      broadcast: (payload) => harness.broadcasts.push({ ...payload }),
+      now: () => now,
+    });
+    await host.hydrate();
+    harness.broadcasts.length = 0;
+    host.reportSelectedActivity({ categoryId: "cat_1", title: "Deep work" });
+
+    await host.start({ bindTracker: true });
+
+    // The state push must not wait on the pending tracker HTTP call.
+    expect(startDraftCalls).toBe(1);
+    expect(harness.broadcasts.length).toBeGreaterThanOrEqual(1);
+    expect(harness.broadcasts[0].snapshot.state.isRunning).toBe(true);
+
+    resolveStartDraft("draft-1");
+    await vi.waitFor(() => {
+      expect(harness.broadcasts.length).toBeGreaterThanOrEqual(2);
+    });
+    expect(host.getSnapshot().state.isRunning).toBe(true);
+  });
+
+  it("broadcasts stop before the bound draft finalize resolves", async () => {
+    const harness = await createHarness();
+    const now = 1_000_000;
+    let resolveStartDraft: (id: string | null) => void = () => {};
+    const startDraftPromise = new Promise<string | null>((resolve) => {
+      resolveStartDraft = resolve;
+    });
+    let resolveStopDraft: (ok: boolean) => void = () => {};
+    const stopDraftPromise = new Promise<boolean>((resolve) => {
+      resolveStopDraft = resolve;
+    });
+    let stopDraftCalls = 0;
+    const host = new PomodoroHost({
+      writer: harness.writer,
+      load: () => loadDesktopState(harness.filePath),
+      tracker: {
+        getActiveDraft: async () => null,
+        startDraft: () => startDraftPromise,
+        stopDraft: async () => {
+          stopDraftCalls += 1;
+          return stopDraftPromise;
+        },
+      },
+      broadcast: (payload) => harness.broadcasts.push({ ...payload }),
+      now: () => now,
+    });
+    await host.hydrate();
+    host.reportSelectedActivity({ categoryId: "cat_1", title: "Deep work" });
+
+    await host.start({ bindTracker: true });
+    resolveStartDraft("draft-1");
+    await vi.waitFor(() => {
+      expect(host.getSnapshot().state.isRunning).toBe(true);
+    });
+    harness.broadcasts.length = 0;
+
+    await host.stop();
+
+    // The stop push must not wait on the pending finalize HTTP call.
+    expect(stopDraftCalls).toBe(1);
+    expect(harness.broadcasts.length).toBeGreaterThanOrEqual(1);
+    expect(harness.broadcasts[0].snapshot.state.phase).toBe("idle");
+
+    resolveStopDraft(true);
+    await vi.waitFor(() => {
+      expect(harness.broadcasts.length).toBeGreaterThanOrEqual(2);
+    });
+    expect(host.getSnapshot().state.phase).toBe("idle");
   });
 });
 

@@ -49,10 +49,12 @@ const getServerHydratedSnapshot = () => false;
 type PomodoroContextValue = {
   state: PomodoroState;
   isHydrated: boolean;
+  reminderEnabled: boolean;
   start: () => void;
   stop: () => void;
   skip: () => void;
   updateSettings: (partial: Partial<PomodoroSettings>) => void;
+  updateReminderEnabled: (enabled: boolean) => void;
   notificationStatus: PomodoroNotificationStatus;
   requestNotificationPermission: () => Promise<PomodoroNotificationStatus>;
   reportNotificationFailure: () => void;
@@ -85,6 +87,7 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     return hydratePomodoroState(loaded, Date.now());
   });
   const [state, setState] = useState<PomodoroState>(initialState.state);
+  const [reminderEnabled, setReminderEnabled] = useState(true);
   const [notificationStatus, setNotificationStatus] =
     useState<PomodoroNotificationStatus>(() => getPomodoroNotificationStatus());
   const initialPhaseCompletion = useRef(
@@ -169,6 +172,7 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
   }, [emitPhaseComplete]);
 
   // Desktop transport: subscribe first (last snapshot wins), then fetch once.
+  // Also mirrors the menubar reminder toggle (`desktop:reminder-changed`).
   useEffect(() => {
     const api: NamehAmalDesktop | null = getDesktopApi();
     if (api === null) return;
@@ -176,6 +180,12 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     const unsubscribe = api.onPomodoroStateChanged((snapshot) => {
       if (!cancelled) {
         setState(snapshot.state);
+        setReminderEnabled(snapshot.reminderEnabled);
+      }
+    });
+    const unsubscribeReminder = api.onReminderChanged((enabled) => {
+      if (!cancelled) {
+        setReminderEnabled(enabled);
       }
     });
     api
@@ -183,6 +193,7 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
       .then((snapshot) => {
         if (!cancelled) {
           setState(snapshot.state);
+          setReminderEnabled(snapshot.reminderEnabled);
         }
       })
       .catch(() => {
@@ -191,6 +202,7 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
       unsubscribe();
+      unsubscribeReminder();
     };
   }, []);
 
@@ -250,6 +262,12 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     setState((current) => updateSettings(current, partial));
   }, []);
 
+  const handleUpdateReminderEnabled = useCallback((enabled: boolean) => {
+    const api = getDesktopApi();
+    if (!api) return; // reminders are desktop-only; nothing to sync on the web
+    void api.setReminderEnabled(enabled).then((next) => setReminderEnabled(next));
+  }, []);
+
   const handleRequestNotificationPermission = useCallback(async () => {
     const status = await requestPomodoroNotificationPermission();
     setNotificationStatus(status);
@@ -274,10 +292,12 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     () => ({
       state,
       isHydrated,
+      reminderEnabled,
       start: handleStart,
       stop: handleStop,
       skip: handleSkip,
       updateSettings: handleUpdateSettings,
+      updateReminderEnabled: handleUpdateReminderEnabled,
       notificationStatus,
       requestNotificationPermission: handleRequestNotificationPermission,
       reportNotificationFailure,
@@ -286,10 +306,12 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     [
       state,
       isHydrated,
+      reminderEnabled,
       handleStart,
       handleStop,
       handleSkip,
       handleUpdateSettings,
+      handleUpdateReminderEnabled,
       notificationStatus,
       handleRequestNotificationPermission,
       reportNotificationFailure,

@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.8] - 2026-09-21
+### Fixed
+- Menu bar and in-app Pomodoro now stay in sync without waiting on tracker
+  HTTP: start/stop state is pushed to every window and the tray immediately,
+  while draft binding/finalization continues in the background.
+
+### Added
+- The in-app Pomodoro settings page mirrors the menu bar "Remind me to start a
+  pomodoro" toggle (both directions), and the settings form re-syncs when
+  settings change from another surface.
+
 ## [0.2.7] - 2026-09-20
 ### Added
 - Added a macOS menu bar extra for the desktop app: live pomodoro countdown

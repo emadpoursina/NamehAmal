@@ -1,18 +1,30 @@
 // Sandbox-compatible preload: exposes the typed `window.namehAmalDesktop` API
 // via contextBridge. Contracts: contracts/ipc.md, research D6.
 //
-// Only `contextBridge` + `ipcRenderer` are imported — both available under
-// `sandbox: true`. Window security settings remain unchanged (contextIsolation
-// true, sandbox true, nodeIntegration false).
+// Sandboxed preload scripts can only require("electron") — relative imports
+// (e.g. ./ipc-channels.js) throw at load and silently kill the bridge. Channel
+// names are therefore inlined here and type imports are erased at build time.
 
 import { contextBridge, ipcRenderer } from "electron";
 
-import {
-  IPC_CHANNELS,
-  type PomodoroSettings,
-  type PomodoroSnapshot,
-  type PomodoroState,
+import type {
+  PomodoroSettings,
+  PomodoroSnapshot,
+  PomodoroState,
 } from "./ipc-channels.js";
+
+// Keep in sync with IPC_CHANNELS in ./ipc-channels.ts.
+const CHANNELS = {
+  getPomodoroState: "pomodoro:get-state",
+  startPomodoro: "pomodoro:start",
+  stopPomodoro: "pomodoro:stop",
+  skipPomodoro: "pomodoro:skip",
+  updatePomodoroSettings: "pomodoro:update-settings",
+  reportSelectedActivity: "desktop:report-selected-activity",
+  setReminderEnabled: "desktop:set-reminder-enabled",
+  pomodoroStateChanged: "pomodoro:state-changed",
+  reminderChanged: "desktop:reminder-changed",
+} as const;
 
 function subscribe<T>(channel: string, listener: (payload: T) => void): () => void {
   const handler = (_event: unknown, payload: T) => listener(payload);
@@ -24,28 +36,28 @@ function subscribe<T>(channel: string, listener: (payload: T) => void): () => vo
 
 const api = {
   getPomodoroState: (): Promise<PomodoroSnapshot> =>
-    ipcRenderer.invoke(IPC_CHANNELS.getPomodoroState),
+    ipcRenderer.invoke(CHANNELS.getPomodoroState),
   startPomodoro: (): Promise<PomodoroState> =>
-    ipcRenderer.invoke(IPC_CHANNELS.startPomodoro),
+    ipcRenderer.invoke(CHANNELS.startPomodoro),
   stopPomodoro: (): Promise<PomodoroState> =>
-    ipcRenderer.invoke(IPC_CHANNELS.stopPomodoro),
+    ipcRenderer.invoke(CHANNELS.stopPomodoro),
   skipPomodoro: (): Promise<PomodoroState> =>
-    ipcRenderer.invoke(IPC_CHANNELS.skipPomodoro),
+    ipcRenderer.invoke(CHANNELS.skipPomodoro),
   updatePomodoroSettings: (partial: Partial<PomodoroSettings>): Promise<PomodoroState> =>
-    ipcRenderer.invoke(IPC_CHANNELS.updatePomodoroSettings, partial),
+    ipcRenderer.invoke(CHANNELS.updatePomodoroSettings, partial),
   reportSelectedActivity: (payload: {
     categoryId: string;
     title: string | null;
   }): Promise<void> =>
-    ipcRenderer.invoke(IPC_CHANNELS.reportSelectedActivity, payload),
+    ipcRenderer.invoke(CHANNELS.reportSelectedActivity, payload),
   setReminderEnabled: (enabled: boolean): Promise<boolean> =>
-    ipcRenderer.invoke(IPC_CHANNELS.setReminderEnabled, enabled),
+    ipcRenderer.invoke(CHANNELS.setReminderEnabled, enabled),
   onPomodoroStateChanged: (
     listener: (snapshot: PomodoroSnapshot) => void,
   ): (() => void) =>
-    subscribe<PomodoroSnapshot>(IPC_CHANNELS.pomodoroStateChanged, listener),
+    subscribe<PomodoroSnapshot>(CHANNELS.pomodoroStateChanged, listener),
   onReminderChanged: (listener: (enabled: boolean) => void): (() => void) =>
-    subscribe<boolean>(IPC_CHANNELS.reminderChanged, listener),
+    subscribe<boolean>(CHANNELS.reminderChanged, listener),
 };
 
 contextBridge.exposeInMainWorld("namehAmalDesktop", api);
