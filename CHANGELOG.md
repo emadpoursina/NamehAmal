@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.2.7] - 2026-09-22
+### Changed
+- Updated `AGENTS.md` to the Next.js 16.3.5 agent-rules block that `next dev` rewrites, and recorded how this Cloud Agent environment installs dependencies, runs the dev server, and runs tests.
+
 ## [0.2.6] - 2026-09-16
 ### Added
 - Added activity check-in to the Pomodoro phase-complete popup: when a phase
