@@ -67,3 +67,4 @@ bun.lockb
 
 # Ai layer
 scratch
+/.agent/pi/

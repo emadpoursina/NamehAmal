@@ -282,6 +282,57 @@ describe("tick ordering and broadcast gating", () => {
   });
 });
 
+describe("mid-countdown updateSettings (US2, FR-007, INV-2)", () => {
+  it("changes only settings while a countdown runs; the original end is preserved", async () => {
+    const harness = await createHarness();
+    let now = 1_000_000;
+    const host = await harness.createHost({ now: () => now });
+    await host.start();
+    harness.broadcasts.length = 0;
+
+    const before = host.getSnapshot().state;
+    expect(before.isRunning).toBe(true);
+    const originalEnd = before.phaseEndsAtMs;
+    expect(originalEnd).not.toBeNull();
+
+    now += 5_000;
+    await host.tick();
+    harness.broadcasts.length = 0;
+    const next = await host.updateSettings({ focusSeconds: 50 * 60 });
+
+    // FR-007: the in-progress countdown keeps its original end...
+    expect(next.phaseEndsAtMs).toBe(originalEnd);
+    expect(next.phase).toBe("focus");
+    expect(next.isRunning).toBe(true);
+    expect(next.remainingSeconds).toBe(
+      DEFAULT_POMODORO_SETTINGS.focusSeconds - 5,
+    );
+    // ...and the new duration applies from the next phase (settings only).
+    expect(next.settings.focusSeconds).toBe(50 * 60);
+
+    // INV-2: both surfaces read the same host state via the broadcast.
+    expect(harness.broadcasts.length).toBe(1);
+    expect(harness.broadcasts[0].snapshot.state.settings.focusSeconds).toBe(
+      50 * 60,
+    );
+    expect(harness.broadcasts[0].snapshot.state.phaseEndsAtMs).toBe(
+      originalEnd,
+    );
+  });
+
+  it("applies the new focus length to the remaining time when idle", async () => {
+    const harness = await createHarness();
+    const host = await harness.createHost();
+
+    const next = await host.updateSettings({ focusSeconds: 40 * 60 });
+
+    expect(next.phase).toBe("idle");
+    expect(next.isRunning).toBe(false);
+    expect(next.settings.focusSeconds).toBe(40 * 60);
+    expect(next.remainingSeconds).toBe(40 * 60);
+  });
+});
+
 describe("tracker binding (D3, T021/T022)", () => {
   it("start with a persisted selected activity issues a tracker start with no timeZone", async () => {
     const harness = await createHarness();
@@ -445,6 +496,40 @@ describe("tracker binding (D3, T021/T022)", () => {
       title: "Deep work",
       reportedAt: expect.any(Number),
     });
+  });
+});
+
+describe("snapshot activity label (T022, FR-012)", () => {
+  it("getSnapshot() exposes the host-resolved activity name and matches the broadcast payload", async () => {
+    const harness = await createHarness();
+    // Draft with a null title but a category name: the exact divergence case
+    // from the convergence finding (tray shows the category, app showed "—").
+    harness.tracker.active = {
+      id: "draft-1",
+      title: null,
+      categoryName: "Deep Work",
+    };
+    const host = await harness.createHost();
+
+    const snapshot = host.getSnapshot();
+    expect(snapshot.activityName).toBe("Deep Work");
+
+    // The broadcast path (tray) and the get-state path (renderer) must agree.
+    await host.start();
+    expect(harness.broadcasts[0].snapshot.activityName).toBe("Deep Work");
+    expect(harness.broadcasts[0].activityName).toBe("Deep Work");
+  });
+
+  it("draft title wins over the category name in the snapshot label", async () => {
+    const harness = await createHarness();
+    harness.tracker.active = {
+      id: "draft-1",
+      title: "Writing docs",
+      categoryName: "Deep Work",
+    };
+    const host = await harness.createHost();
+
+    expect(host.getSnapshot().activityName).toBe("Writing docs");
   });
 });
 

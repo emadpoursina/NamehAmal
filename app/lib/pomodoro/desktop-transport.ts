@@ -7,6 +7,13 @@ import type {
 } from "@/electron/ipc-channels";
 import type { PomodoroSettings, PomodoroState } from "./types.js";
 
+// Host-connection types shared with the view (T003; defined with the pure
+// connection helpers in ./desktop-connection, data-model.md §4).
+export type {
+  PomodoroConnection,
+  PomodoroSnapshotResult,
+} from "./desktop-connection";
+
 export type PomodoroTransport = {
   /** Fetch the current snapshot (invoke `pomodoro:get-state`). */
   getSnapshot: () => Promise<PomodoroSnapshot>;

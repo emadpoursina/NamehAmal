@@ -20,7 +20,13 @@ import {
   updateSettings,
 } from "./engine";
 import { getDesktopApi } from "./desktop-transport";
-import type { NamehAmalDesktop } from "@/electron/ipc-channels";
+import type { NamehAmalDesktop, PomodoroSnapshot } from "@/electron/ipc-channels";
+import {
+  resolvePomodoroConnection,
+  snapshotToActivityName,
+  type PomodoroConnection,
+  type PomodoroSnapshotResult,
+} from "./desktop-connection";
 import {
   loadPomodoroRun,
   loadPomodoroSettings,
@@ -49,6 +55,10 @@ const getServerHydratedSnapshot = () => false;
 type PomodoroContextValue = {
   state: PomodoroState;
   isHydrated: boolean;
+  /** Renderer↔host connection (data-model.md §4): local | waiting | connected. */
+  connection: PomodoroConnection;
+  /** Host-resolved activity label (FR-012); null while waiting/local. */
+  activityName: string | null;
   reminderEnabled: boolean;
   start: () => void;
   stop: () => void;
@@ -88,6 +98,19 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
   });
   const [state, setState] = useState<PomodoroState>(initialState.state);
   const [reminderEnabled, setReminderEnabled] = useState(true);
+  // Desktop-mode connection machine (contracts/host-sync.md §1): the provider
+  // mounts at "waiting" and reaches "connected" on the first valid snapshot
+  // from the mount fetch, a `pomodoro:state-changed` push, or the
+  // `did-finish-load` re-sync push. There is no timeout fallback to a local
+  // engine (FR-009) and no localStorage access in desktop mode (FR-004).
+  const [desktopSnapshotResult, setDesktopSnapshotResult] =
+    useState<PomodoroSnapshotResult>("pending");
+  const hasDesktopApi = getDesktopApi() !== null;
+  const connection = resolvePomodoroConnection({
+    hasDesktopApi,
+    snapshotResult: desktopSnapshotResult,
+  });
+  const [activityName, setActivityName] = useState<string | null>(null);
   const [notificationStatus, setNotificationStatus] =
     useState<PomodoroNotificationStatus>(() => getPomodoroNotificationStatus());
   const initialPhaseCompletion = useRef(
@@ -177,11 +200,14 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     const api: NamehAmalDesktop | null = getDesktopApi();
     if (api === null) return;
     let cancelled = false;
+    const applySnapshot = (snapshot: PomodoroSnapshot) => {
+      setDesktopSnapshotResult(snapshot);
+      setState(snapshot.state);
+      setReminderEnabled(snapshot.reminderEnabled);
+      setActivityName(snapshotToActivityName(snapshot));
+    };
     const unsubscribe = api.onPomodoroStateChanged((snapshot) => {
-      if (!cancelled) {
-        setState(snapshot.state);
-        setReminderEnabled(snapshot.reminderEnabled);
-      }
+      if (!cancelled) applySnapshot(snapshot);
     });
     const unsubscribeReminder = api.onReminderChanged((enabled) => {
       if (!cancelled) {
@@ -191,13 +217,18 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     api
       .getPomodoroState()
       .then((snapshot) => {
-        if (!cancelled) {
-          setState(snapshot.state);
-          setReminderEnabled(snapshot.reminderEnabled);
+        if (cancelled) return;
+        // `null` is a first-class "host not connected yet" response: stay in
+        // "waiting" (contracts/host-sync.md §1) — no local-engine fallback.
+        if (snapshot === null) {
+          setDesktopSnapshotResult(null);
+          return;
         }
+        applySnapshot(snapshot);
       })
       .catch(() => {
-        // Keep defaults until the next push; never crash the renderer.
+        // Keep waiting until the next push; never crash the renderer.
+        if (!cancelled) setDesktopSnapshotResult("rejected");
       });
     return () => {
       cancelled = true;
@@ -225,48 +256,53 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
   const handleStart = useCallback(() => {
     const api = getDesktopApi();
     if (api) {
+      if (connection !== "connected") return; // controls inert until the host connects (FR-009)
       void api.startPomodoro().then((next) => setState(next));
       return;
     }
     setState((current) => {
       return start(current);
     });
-  }, []);
+  }, [connection]);
 
   const handleStop = useCallback(() => {
     const api = getDesktopApi();
     if (api) {
+      if (connection !== "connected") return; // controls inert until the host connects (FR-009)
       void api.stopPomodoro().then((next) => setState(next));
       return;
     }
     setState((current) => {
       return stop(current);
     });
-  }, []);
+  }, [connection]);
 
   const handleSkip = useCallback(() => {
     const api = getDesktopApi();
     if (api) {
+      if (connection !== "connected") return; // controls inert until the host connects (FR-009)
       void api.skipPomodoro().then((next) => setState(next));
       return;
     }
     setState((current) => skip(current).state);
-  }, []);
+  }, [connection]);
 
   const handleUpdateSettings = useCallback((partial: Partial<PomodoroSettings>) => {
     const api = getDesktopApi();
     if (api) {
+      if (connection !== "connected") return; // controls inert until the host connects (FR-009)
       void api.updatePomodoroSettings(partial).then((next) => setState(next));
       return;
     }
     setState((current) => updateSettings(current, partial));
-  }, []);
+  }, [connection]);
 
   const handleUpdateReminderEnabled = useCallback((enabled: boolean) => {
     const api = getDesktopApi();
     if (!api) return; // reminders are desktop-only; nothing to sync on the web
+    if (connection !== "connected") return; // controls inert until the host connects (FR-009)
     void api.setReminderEnabled(enabled).then((next) => setReminderEnabled(next));
-  }, []);
+  }, [connection]);
 
   const handleRequestNotificationPermission = useCallback(async () => {
     const status = await requestPomodoroNotificationPermission();
@@ -292,6 +328,8 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     () => ({
       state,
       isHydrated,
+      connection,
+      activityName, // host-derived string | null; the view applies the neutral fallback (FR-012)
       reminderEnabled,
       start: handleStart,
       stop: handleStop,
@@ -306,6 +344,8 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     [
       state,
       isHydrated,
+      connection,
+      activityName,
       reminderEnabled,
       handleStart,
       handleStop,
