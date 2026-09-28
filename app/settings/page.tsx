@@ -4,6 +4,7 @@ import { ActivityManager } from "./ActivityManager";
 import type { ActivityWithCategory } from "./ActivityFormDialog";
 import { CategoryManager } from "./CategoryManager";
 import { DataManager } from "./DataManager";
+import { SyncBridgeCard } from "./SyncBridgeCard";
 import { TimezoneSettingsCard } from "./TimezoneSettingsCard";
 import { WeeklyTargetsCard } from "./WeeklyTargetsCard";
 
@@ -48,6 +49,7 @@ export default async function SettingsPage() {
         active={active}
       />
       <DataManager />
+      <SyncBridgeCard />
     </div>
   );
 }

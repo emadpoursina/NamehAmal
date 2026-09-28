@@ -88,10 +88,32 @@ model Session {
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
 
+  /// Stable logical time-entry identity shared with the Android companion (equals the phone entryId for synced rows; null for pre-sync legacy rows until backfilled).
+  syncId String? @unique
+
+  /// Stable id of the device that originated this entry (desktop installation id or Android installation id).
+  sourceDeviceId String?
+
+  /// Desktop Activity relation for synced entries (null means Unassigned; breaks carry no activity).
+  activityId String?
+
+  /// Entry type for synced intervals: WORK counts toward totals, BREAK is excluded.
+  entryType String? @default("WORK")
+
+  /// Confirmation state for synced intervals (CONFIRMED or UNCONFIRMED after a missed check-in).
+  confirmationState String? @default("CONFIRMED")
+
+  /// Revision id of the currently accepted version of this entry; competing versions are retained in SyncRevision.
+  currentRevisionId String?
+
+  /// Tombstone timestamp for a user deletion exchanged over sync; the original version remains in history.
+  deletedAt DateTime?
+
   @@index([occurredAt])
   @@index([categoryId, occurredAt])
   @@index([startedAt])
   @@index([endedAt])
+  @@index([syncId])
 }
 
 /// In-progress live timer (not a finalized Session row until stop).
@@ -121,4 +143,135 @@ model AppSettings {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+/// Device record identifying one sync participant (desktop installation or Android installation). Identity only; not an authentication credential.
+model SyncDevice {
+  /// Stable device id generated once per app installation/profile.
+  deviceId String @id
+
+  /// Participant type: ANDROID or DESKTOP.
+  deviceType String
+
+  /// Last successful exchange timestamp for this device (null until the first successful sync).
+  lastSeenAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Immutable version snapshot for one logical time entry. Repeating a revisionId is an idempotent no-op.
+model SyncRevision {
+  /// Globally unique idempotency key for one complete entry snapshot.
+  revisionId String @id
+
+  /// Logical entry this version describes.
+  entryId String
+
+  /// Version observed when this edit began; null for the initial revision.
+  baseRevisionId String?
+
+  /// Device that authored this revision.
+  changedByDeviceId String
+
+  /// Immutable originating device of the logical entry.
+  sourceDeviceId String
+
+  /// Audit timestamp; never used as replication cursor or conflict winner.
+  updatedAt DateTime
+
+  /// Complete normalized entry snapshot JSON (interval values and deletion tombstone state).
+  payloadJson String
+
+  /// Host-owned monotonic change sequence assigned on accept; download ordering uses this, never client timestamps.
+  seq Int @unique
+
+  createdAt DateTime @default(now())
+
+  @@index([entryId])
+}
+
+/// Monotonic host change log backing the opaque sync cursor. Cursor values are sequence positions, never wall-clock timestamps.
+model HostChangeLog {
+  /// Stable change record id.
+  changeId String @id @default(cuid())
+
+  /// Monotonic host sequence number for download ordering and paging.
+  seq Int @unique
+
+  /// Change kind: REVISION, CONFLICT, or RESOLUTION.
+  kind String
+
+  /// Referenced revisionId, conflictId, or resolutionId depending on kind.
+  refId String
+
+  createdAt DateTime @default(now())
+
+  @@index([seq])
+}
+
+/// Overlap or competing-edit conflict requiring an explicit user decision. Original source records are never removed.
+model SyncConflict {
+  /// Stable conflict identity.
+  conflictId String @id @default(cuid())
+
+  /// Conflict type: CONCURRENT_EDIT for competing revisions of one entry, OVERLAP for intersecting distinct entries.
+  conflictType String
+
+  /// JSON array of the involved logical entry ids.
+  entryIdsJson String
+
+  /// JSON array of the exact competing revision ids, kept inspectable.
+  revisionIdsJson String
+
+  /// Start of the intersecting range for interval overlaps; null for pure concurrent edits without overlap.
+  overlapStartAt DateTime?
+
+  /// End of the intersecting range for interval overlaps; null for pure concurrent edits without overlap.
+  overlapEndAt DateTime?
+
+  /// Lifecycle state: UNRESOLVED, RESOLVED, or UNDONE (undo re-opens the conflict).
+  state String @default("UNRESOLVED")
+
+  /// Resolution that resolved this conflict, if any.
+  resolutionId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([state])
+}
+
+/// User resolution or undo decision for one conflict. Applied as new revisions; history is append-only.
+model ConflictResolution {
+  /// Stable id; each resolution or undo action creates a new record.
+  resolutionId String @id
+
+  /// Conflict being resolved.
+  conflictId String
+
+  /// User-selected action: KEEP_ENTRY, SPLIT, EDIT, UNASSIGNED, or UNDO.
+  action String
+
+  /// Chosen preserved revision for keep-version choices; null for split/edit/Unassigned choices.
+  selectedRevisionId String?
+
+  /// JSON array of new/current entry ids produced by the choice.
+  resultEntryIdsJson String
+
+  /// Device on which the user made the choice.
+  resolvedByDeviceId String
+
+  /// Audit timestamp of the user decision.
+  resolvedAt DateTime
+
+  /// For UNDO actions, the resolution being undone; otherwise null.
+  undoesResolutionId String?
+
+  /// Host-owned monotonic change sequence assigned on accept.
+  seq Int @unique
+
+  createdAt DateTime @default(now())
+
+  @@index([conflictId])
 }

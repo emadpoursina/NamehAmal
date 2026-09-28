@@ -69,13 +69,14 @@ async function waitForServer(
 async function startPackagedServer(
   port: number,
   profileDirectory?: string,
+  standaloneDirectory = standaloneRoot,
 ) {
   const profile =
     profileDirectory ?? (await mkdtemp(path.join(tmpdir(), "nameh-amal-package-")));
   const databasePath = path.join(profile, "nameh-amal.db");
   await runMigration(databasePath);
-  const child = spawn(process.execPath, [path.join(standaloneRoot, "server.js")], {
-    cwd: standaloneRoot,
+  const child = spawn(process.execPath, [path.join(standaloneDirectory, "server.js")], {
+    cwd: standaloneDirectory,
     env: {
       ...process.env,
       DATABASE_URL: `file:${databasePath}`,
@@ -111,6 +112,22 @@ async function closeHttpServer(server: ReturnType<typeof createServer>): Promise
   });
 }
 
+async function getFreePort(): Promise<number> {
+  const server = createServer();
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => resolve());
+  });
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    await closeHttpServer(server);
+    throw new Error("Could not determine an available test port.");
+  }
+  const port = address.port;
+  await closeHttpServer(server);
+  return port;
+}
+
 async function requestJson(
   origin: string,
   route: string,
@@ -144,9 +161,53 @@ packagedTests("packaged desktop runtime", () => {
     ).toBe(true);
     expect(existsSync(path.join(standaloneRoot, "public"))).toBe(true);
     expect(existsSync(path.join(standaloneRoot, ".next", "static"))).toBe(true);
+    expect(
+      existsSync(path.join(projectRoot, ".next", "standalone", "public")),
+    ).toBe(true);
+    expect(
+      existsSync(
+        path.join(projectRoot, ".next", "standalone", ".next", "static", "chunks"),
+      ),
+    ).toBe(true);
     expect(existsSync(path.join(runtimeRoot, "prisma", "migrations"))).toBe(true);
     database.close();
   });
+
+  it(
+    "serves CSS and JavaScript from the direct standalone runtime used by desktop:dev",
+    async () => {
+      const developmentStandaloneRoot = path.join(
+        projectRoot,
+        ".next",
+        "standalone",
+      );
+      const chunks = await readdir(
+        path.join(developmentStandaloneRoot, ".next", "static", "chunks"),
+      );
+      const cssChunk = chunks.find((chunk) => chunk.endsWith(".css"));
+      const jsChunk = chunks.find((chunk) => chunk.endsWith(".js"));
+      expect(cssChunk).toBeDefined();
+      expect(jsChunk).toBeDefined();
+
+      const { child, origin } = await startPackagedServer(
+        await getFreePort(),
+        undefined,
+        developmentStandaloneRoot,
+      );
+      try {
+        for (const chunk of [cssChunk, jsChunk]) {
+          const asset = await fetch(
+            `${origin}/_next/static/chunks/${encodeURIComponent(chunk!)}`,
+          );
+          expect(asset.ok).toBe(true);
+          expect(await asset.text()).not.toHaveLength(0);
+        }
+      } finally {
+        await stopPackagedServer(child);
+      }
+    },
+    30_000,
+  );
 
   it("does not retain build-machine links for traced native modules", async () => {
     const tracedNodeModules = path.join(
@@ -171,7 +232,7 @@ packagedTests("packaged desktop runtime", () => {
       const databasePath = path.join(profile, "nameh-amal.db");
       await runMigration(databasePath);
 
-      const port = 3061;
+      const port = await getFreePort();
       const child = spawn(process.execPath, [path.join(standaloneRoot, "server.js")], {
         cwd: standaloneRoot,
         env: {
@@ -204,7 +265,8 @@ packagedTests("packaged desktop runtime", () => {
     "reuses a migrated profile and fails closed on an occupied desktop port",
     async () => {
       const profile = await mkdtemp(path.join(tmpdir(), "nameh-amal-package-"));
-      const first = await startPackagedServer(3064, profile);
+      const port = await getFreePort();
+      const first = await startPackagedServer(port, profile);
 
       try {
         const category = await requestJson(first.origin, "/api/categories", {
@@ -217,7 +279,7 @@ packagedTests("packaged desktop runtime", () => {
         await stopPackagedServer(first.child);
       }
 
-      const second = await startPackagedServer(3064, profile);
+      const second = await startPackagedServer(port, profile);
       try {
         const categories = await requestJson(second.origin, "/api/categories");
         expect(categories.response.ok).toBe(true);
@@ -250,9 +312,10 @@ packagedTests("packaged desktop runtime", () => {
         response.writeHead(200, { "content-type": "application/json" });
         response.end(JSON.stringify({ ok: true, data: { unrelated: true } }));
       });
+      const occupiedPort = await getFreePort();
       await new Promise<void>((resolve, reject) => {
         unrelated.once("error", reject);
-        unrelated.listen(3060, "127.0.0.1", () => resolve());
+        unrelated.listen(occupiedPort, "127.0.0.1", () => resolve());
       });
 
       const packagedConfig = createRuntimeConfig({
@@ -266,6 +329,8 @@ packagedTests("packaged desktop runtime", () => {
       const runtime = new ServerProcess({
         config: {
           ...packagedConfig,
+          port: occupiedPort as typeof packagedConfig.port,
+          origin: `http://127.0.0.1:${occupiedPort}` as typeof packagedConfig.origin,
           runtimeDirectory: runtimeRoot,
           standaloneDirectory: standaloneRoot,
           serverScriptPath: path.join(standaloneRoot, "server.js"),
@@ -296,7 +361,7 @@ packagedTests("packaged desktop runtime", () => {
   it(
     "preserves tracking, review, organization, timezone, and backup APIs",
     async () => {
-      const { child, origin } = await startPackagedServer(3062);
+      const { child, origin } = await startPackagedServer(await getFreePort());
 
       try {
         const settings = await requestJson(origin, "/api/settings");
@@ -558,7 +623,8 @@ packagedTests("packaged desktop runtime", () => {
     "recovers one active timer after a staged-server restart and finalizes it once",
     async () => {
       const profile = await mkdtemp(path.join(tmpdir(), "nameh-amal-package-"));
-      const first = await startPackagedServer(3065, profile);
+      const port = await getFreePort();
+      const first = await startPackagedServer(port, profile);
       let categoryId = "";
       let activeTimerId = "";
 
@@ -587,7 +653,7 @@ packagedTests("packaged desktop runtime", () => {
         await stopPackagedServer(first.child);
       }
 
-      const second = await startPackagedServer(3065, profile);
+      const second = await startPackagedServer(port, profile);
       try {
         const recovered = await requestJson(second.origin, "/api/tracker");
         expect(recovered.response.ok).toBe(true);
@@ -629,7 +695,7 @@ packagedTests("packaged desktop runtime", () => {
   it(
     "covers adjacent-day ranges, weekly goals, archived history, and activity presets",
     async () => {
-      const { child, origin } = await startPackagedServer(3066);
+      const { child, origin } = await startPackagedServer(await getFreePort());
 
       try {
         const alpha = await requestJson(origin, "/api/categories", {
@@ -866,7 +932,7 @@ packagedTests("packaged desktop runtime", () => {
   it(
     "merges imported categories and targets while retaining duplicate-session compatibility",
     async () => {
-      const { child, origin } = await startPackagedServer(3067);
+      const { child, origin } = await startPackagedServer(await getFreePort());
 
       try {
         const existing = await requestJson(origin, "/api/categories", {
@@ -965,7 +1031,7 @@ packagedTests("packaged desktop runtime", () => {
   it(
     "rejects malformed and failed imports without partial writes",
     async () => {
-      const { child, origin } = await startPackagedServer(3068);
+      const { child, origin } = await startPackagedServer(await getFreePort());
 
       try {
         const existingCategory = await requestJson(origin, "/api/categories", {
@@ -1084,7 +1150,8 @@ packagedTests("packaged desktop runtime", () => {
     "leaves an interrupted packaged import either complete or transactionally empty",
     async () => {
       const profile = await mkdtemp(path.join(tmpdir(), "nameh-amal-package-"));
-      const first = await startPackagedServer(3069, profile);
+      const port = await getFreePort();
+      const first = await startPackagedServer(port, profile);
       const sessions = Array.from({ length: 1_000 }, (_, index) => ({
         kind: "MANUAL",
         categoryName: "Shutdown import",
@@ -1115,7 +1182,7 @@ packagedTests("packaged desktop runtime", () => {
         importReportedSuccess = false;
       }
 
-      const recovered = await startPackagedServer(3069, profile);
+      const recovered = await startPackagedServer(port, profile);
       try {
         const stored = await requestJson(
           recovered.origin,
@@ -1180,10 +1247,16 @@ packagedTests("packaged desktop runtime", () => {
 
       const exportResult = await pendingExport;
       if ("response" in exportResult && exportResult.response.ok) {
+        // The server can emit headers before shutdown aborts the response body.
+        // That is an expected close-during-export outcome; it must not count as a completed export.
+        try {
           const payload = JSON.parse(
             await exportResult.response.text(),
           ) as { version: number };
           expect(payload.version).toBe(2);
+        } catch (error) {
+          expect(error).toHaveProperty("name", "AbortError");
+        }
       }
 
       const recovered = await startPackagedServer(3070, profile);
@@ -1207,7 +1280,7 @@ packagedTests("packaged desktop runtime", () => {
   it(
     "imports a generated 1,000-session backup and reports valid records",
     async () => {
-      const { child, origin } = await startPackagedServer(3063);
+      const { child, origin } = await startPackagedServer(await getFreePort());
 
       try {
         const sessions = Array.from({ length: 1_000 }, (_, index) => ({

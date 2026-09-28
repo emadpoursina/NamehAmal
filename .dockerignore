@@ -4,6 +4,9 @@
 
 # Dependencies (installed inside the image)
 node_modules/
+android/
+**/.gradle/
+local.properties
 .pnpm-store/
 npm-debug.log*
 yarn-debug.log*
@@ -17,6 +20,8 @@ dist/
 build/
 .vercel/
 *.tsbuildinfo
+*.log
+*.tmp
 app/generated/prisma/
 
 # Local SQLite databases

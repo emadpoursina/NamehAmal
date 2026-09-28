@@ -3,6 +3,8 @@ import path from "node:path";
 export const DESKTOP_HOST = "127.0.0.1";
 export const DESKTOP_PORT = 3060;
 export const DESKTOP_ORIGIN = `http://${DESKTOP_HOST}:${DESKTOP_PORT}`;
+/** Default LAN port for the allowlisted sync bridge (never the loopback UI port). */
+export const SYNC_BRIDGE_DEFAULT_PORT = 3061;
 export const DATABASE_FILENAME = "nameh-amal.db";
 
 export interface RuntimeConfigOptions {
@@ -31,6 +33,8 @@ export interface RuntimeConfig {
   host: typeof DESKTOP_HOST;
   port: typeof DESKTOP_PORT;
   origin: typeof DESKTOP_ORIGIN;
+  /** LAN port for the allowlisted sync bridge (default 3061, separate from the loopback app listener). */
+  syncPort: number;
 }
 
 export function resolveDatabasePath(databaseUrl: string, baseDirectory: string): string {
@@ -77,6 +81,13 @@ export function createRuntimeConfig(options: RuntimeConfigOptions = {}): Runtime
           projectRoot,
         );
   const migrationRoot = isPackaged ? runtimeDirectory : projectRoot;
+  const syncPortRaw = process.env.NAMEHAMAL_SYNC_PORT;
+  const parsedSyncPort = syncPortRaw ? Number.parseInt(syncPortRaw, 10) : NaN;
+  const syncPort = Number.isInteger(parsedSyncPort) &&
+      parsedSyncPort > 0 &&
+      parsedSyncPort <= 65535
+    ? parsedSyncPort
+    : SYNC_BRIDGE_DEFAULT_PORT;
 
   return {
     isPackaged,
@@ -101,6 +112,7 @@ export function createRuntimeConfig(options: RuntimeConfigOptions = {}): Runtime
     host: DESKTOP_HOST,
     port: DESKTOP_PORT,
     origin: DESKTOP_ORIGIN,
+    syncPort,
   };
 }
 

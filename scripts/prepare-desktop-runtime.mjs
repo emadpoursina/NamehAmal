@@ -205,10 +205,12 @@ async function main() {
     await readFile(requiredPath(projectRoot, "package.json"), "utf8"),
   );
   const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
+  // The staged runtime lives under the project root. Remove stale staged files
+  // before Next traces the project, or later builds can recursively include it.
+  await rm(stageDirectory, { recursive: true, force: true });
   await run(npmCommand, ["rebuild", "better-sqlite3"]);
   await run(npmCommand, ["run", "build"]);
 
-  await rm(stageDirectory, { recursive: true, force: true });
   await mkdir(stageDirectory, { recursive: true });
 
   const stagedStandalone = requiredPath(stageDirectory, "standalone");
@@ -231,6 +233,18 @@ async function main() {
     requiredPath(projectRoot, ".next", "static"),
     requiredPath(stagedStandalone, ".next", "static"),
     "the Next static asset directory",
+  );
+  // desktop:dev launches .next/standalone directly; Next intentionally omits
+  // public and .next/static from that output unless they are copied manually.
+  await copyRequired(
+    requiredPath(projectRoot, "public"),
+    requiredPath(standaloneDirectory, "public"),
+    "the public asset directory for the development runtime",
+  );
+  await copyRequired(
+    requiredPath(projectRoot, ".next", "static"),
+    requiredPath(standaloneDirectory, ".next", "static"),
+    "the Next static asset directory for the development runtime",
   );
   await copyRequired(
     requiredPath(projectRoot, "prisma", "schema.prisma"),

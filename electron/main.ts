@@ -13,6 +13,7 @@ import {
   DesktopRuntimeError,
   ServerProcess,
 } from "./server-process.js";
+import { createSyncBridge, type SyncBridge } from "./sync-bridge.js";
 import {
   IPC_CHANNELS,
   type PomodoroSnapshot,
@@ -28,6 +29,7 @@ import { MenuBarTray } from "./tray.js";
 
 let mainWindow: BrowserWindow | null = null;
 let serverProcess: ServerProcess | null = null;
+let syncBridge: SyncBridge | null = null;
 let runtimeConfig: RuntimeConfig | null = null;
 let isQuitting = false;
 let startupPromise: Promise<void> | null = null;
@@ -289,6 +291,18 @@ async function startApplication(): Promise<void> {
   });
   try {
     await serverProcess.start();
+    // Start the LAN-only sync bridge after the loopback server is ready. A
+    // bridge failure is retryable on next launch and never blocks the desktop UI.
+    try {
+      syncBridge = createSyncBridge({
+        loopbackOrigin: runtimeConfig.origin,
+        syncPort: runtimeConfig.syncPort,
+      });
+      await syncBridge.start();
+    } catch (bridgeError) {
+      syncBridge = null;
+      console.error("Sync bridge did not start; Android sync will be unavailable.", bridgeError);
+    }
     startPomodoroFoundation();
     await createMainWindow();
   } finally {
@@ -317,6 +331,8 @@ async function shutdown(): Promise<void> {
   }
   await serverProcess?.stop();
   serverProcess = null;
+  await syncBridge?.stop();
+  syncBridge = null;
 }
 
 const gotSingleInstanceLock = app.requestSingleInstanceLock();

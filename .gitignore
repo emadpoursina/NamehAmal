@@ -19,6 +19,9 @@
 
 # production
 /build/*
+android/**/build/
+**/.gradle/
+local.properties
 !/build/entitlements.mac.plist
 /dist
 /release
@@ -27,6 +30,11 @@
 
 # misc
 .DS_Store
+Thumbs.db
+*.tmp
+*.swp
+.vscode/
+.idea/
 *.pem
 
 # debug
