@@ -63,7 +63,7 @@ class SyncSettingsViewModel(
         viewModelScope.launch {
             val problem = endpointStore.save(current.host, port)
             mutable.value = if (problem == null) {
-                mutable.value.copy(message = "Saved. Tap Sync to upload completed sessions.", isError = false)
+                mutable.value.copy(message = "Saved. Tap Sync to refresh desktop categories/activities and upload completed sessions.", isError = false)
             } else {
                 mutable.value.copy(message = problem, isError = true)
             }
@@ -97,7 +97,7 @@ class SyncSettingsViewModel(
             mutable.value = when (outcome) {
                 is SyncOutcome.Success -> mutable.value.copy(
                     isSyncing = false,
-                    message = "Sync complete: ${outcome.uploadedRevisions} session(s) acknowledged by desktop.",
+                    message = "Sync complete: categories and activities refreshed; ${outcome.uploadedRevisions} session(s) acknowledged by desktop.",
                     isError = false,
                     pendingCount = syncRepository.pendingCount(),
                 )

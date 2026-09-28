@@ -32,4 +32,5 @@ data class TimeIntervalEntity(
     val deletedAt: Long? = null,
     @ColumnInfo(defaultValue = "'Unassigned'") val title: String = "Unassigned",
     val syncedAt: Long? = null,
+    val categoryId: String? = null,
 )

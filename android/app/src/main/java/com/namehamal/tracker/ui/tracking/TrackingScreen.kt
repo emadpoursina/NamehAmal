@@ -1,6 +1,10 @@
 package com.namehamal.tracker.ui.tracking
 
+import android.app.DatePickerDialog
+import android.app.TimePickerDialog
+import android.text.format.DateFormat
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -13,22 +17,34 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
 import com.namehamal.tracker.data.local.TimeIntervalEntity
+import com.namehamal.tracker.data.local.ActivitySnapshotEntity
+import com.namehamal.tracker.data.local.CategorySnapshotEntity
 import com.namehamal.tracker.ui.sync.SyncSettingsViewModel
 import com.namehamal.tracker.ui.sync.SyncUiState
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
@@ -90,26 +106,40 @@ fun TrackingScreen(
             }
 
             Text("Add a session", style = MaterialTheme.typography.titleLarge)
+            SavedActivityPicker(
+                activities = state.activities,
+                categories = state.categories,
+                recentTitles = state.titleSuggestions,
+                selectedActivityId = state.selectedActivityId,
+                onSelectActivity = viewModel::selectActivity,
+                onSelectRecentTitle = viewModel::selectRecentTitle,
+            )
             OutlinedTextField(
                 value = state.title,
                 onValueChange = viewModel::editTitle,
                 label = { Text("Activity title") },
+                placeholder = { Text("Type a custom activity") },
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().testTag("activity-title"),
             )
-            OutlinedTextField(
+            LocalDateTimePicker(
+                label = "Start",
                 value = state.startedAtLocal,
                 onValueChange = viewModel::editStartedAt,
-                label = { Text("Start (YYYY-MM-DD HH:MM, local time)") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
+                dateTag = "start-date-picker",
+                timeTag = "start-time-picker",
             )
-            OutlinedTextField(
+            LocalDateTimePicker(
+                label = "End",
                 value = state.endedAtLocal,
                 onValueChange = viewModel::editEndedAt,
-                label = { Text("End (YYYY-MM-DD HH:MM, local time)") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
+                dateTag = "end-date-picker",
+                timeTag = "end-time-picker",
+            )
+            CategoryPicker(
+                categories = state.categories,
+                selectedCategoryId = state.selectedCategoryId,
+                onSelect = viewModel::selectCategory,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = viewModel::saveCompleted) { Text("Save completed") }
@@ -123,20 +153,6 @@ fun TrackingScreen(
                 )
             }
 
-            if (state.titleSuggestions.isNotEmpty()) {
-                Text("Start again", style = MaterialTheme.typography.titleMedium)
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    state.titleSuggestions.forEach { title ->
-                        OutlinedButton(
-                            onClick = { viewModel.startAgain(title) },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text(title)
-                        }
-                    }
-                }
-            }
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -148,6 +164,33 @@ fun TrackingScreen(
                     }
                 }
             }
+            if (state.events.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        TextButton(
+                            onClick = viewModel::selectAll,
+                            enabled = state.selectedEntryIds.size < state.events.size,
+                        ) {
+                            Text("Select all")
+                        }
+                        TextButton(
+                            onClick = viewModel::clearSelection,
+                            enabled = state.selectedEntryIds.isNotEmpty(),
+                        ) {
+                            Text("Clear selection")
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        TextButton(
+                            onClick = viewModel::requestRemoveSelected,
+                            enabled = state.selectedEntryIds.isNotEmpty(),
+                        ) {
+                            Text("Remove selected (${state.selectedEntryIds.size})")
+                        }
+                        TextButton(onClick = viewModel::requestClearAll) { Text("Clear all") }
+                    }
+                }
+            }
             if (state.events.isEmpty()) {
                 Text("No sessions yet. Add a completed session or start recording.")
             } else {
@@ -156,7 +199,9 @@ fun TrackingScreen(
                         SessionCard(
                             event = event,
                             nowMillis = state.nowMillis,
-                            onStartAgain = { viewModel.startAgain(event.title) },
+                            isSelected = event.entryId in state.selectedEntryIds,
+                            onToggleSelection = { viewModel.toggleSelection(event.entryId) },
+                            onStartAgain = { viewModel.prepareRestart(event) },
                             onRemove = { viewModel.requestRemove(event) },
                         )
                     }
@@ -181,6 +226,40 @@ fun TrackingScreen(
         )
     }
 
+    state.pendingBulkRemovalIds?.let { ids ->
+        val runningCount = state.events.count { it.entryId in ids && it.endedAt == null }
+        AlertDialog(
+            onDismissRequest = viewModel::cancelRemoveSelected,
+            title = { Text("Remove selected sessions?") },
+            text = {
+                Text(
+                    "Remove ${ids.size} selected session(s) from this device only? " +
+                        (if (runningCount > 0) "$runningCount running session(s) will stop and be removed. " else "") +
+                        "Desktop copies, saved endpoint, and categories will remain.",
+                )
+            },
+            confirmButton = { TextButton(onClick = viewModel::confirmRemoveSelected) { Text("Remove selected") } },
+            dismissButton = { TextButton(onClick = viewModel::cancelRemoveSelected) { Text("Cancel") } },
+        )
+    }
+
+    if (state.confirmClearAll) {
+        val runningCount = state.events.count { it.endedAt == null }
+        AlertDialog(
+            onDismissRequest = viewModel::cancelClearAll,
+            title = { Text("Clear all sessions?") },
+            text = {
+                Text(
+                    "Remove all ${state.events.size} Android-local session(s), regardless of selection? " +
+                        (if (runningCount > 0) "$runningCount running session(s) will stop and be removed. " else "") +
+                        "Desktop copies, saved endpoint, and categories will remain.",
+                )
+            },
+            confirmButton = { TextButton(onClick = viewModel::confirmClearAll) { Text("Clear all") } },
+            dismissButton = { TextButton(onClick = viewModel::cancelClearAll) { Text("Cancel") } },
+        )
+    }
+
     if (state.confirmClearSynced) {
         AlertDialog(
             onDismissRequest = viewModel::cancelClearSynced,
@@ -191,6 +270,177 @@ fun TrackingScreen(
             confirmButton = { TextButton(onClick = viewModel::confirmClearSynced) { Text("Clear synced") } },
             dismissButton = { TextButton(onClick = viewModel::cancelClearSynced) { Text("Cancel") } },
         )
+    }
+}
+
+@Composable
+private fun SavedActivityPicker(
+    activities: List<ActivitySnapshotEntity>,
+    categories: List<CategorySnapshotEntity>,
+    recentTitles: List<String>,
+    selectedActivityId: String?,
+    onSelectActivity: (String) -> Unit,
+    onSelectRecentTitle: (String) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val selectedActivity = activities.firstOrNull { it.activityId == selectedActivityId }
+    val customTitles = recentTitles.filterNot { title -> activities.any { it.title == title } }
+
+    Column {
+        Text("Saved activities and recent titles")
+        OutlinedButton(
+            onClick = { expanded = true },
+            modifier = Modifier.fillMaxWidth().testTag("saved-activity-picker"),
+        ) {
+            Text(selectedActivity?.title ?: "Choose from list")
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            if (activities.isNotEmpty()) {
+                Text(
+                    "Desktop activities",
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    style = MaterialTheme.typography.labelMedium,
+                )
+                activities.forEach { activity ->
+                    val categoryName = categories.firstOrNull { it.categoryId == activity.categoryId }?.name
+                    DropdownMenuItem(
+                        text = {
+                            Column {
+                                Text(activity.title)
+                                if (categoryName != null) {
+                                    Text(categoryName, style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
+                        },
+                        onClick = {
+                            onSelectActivity(activity.activityId)
+                            expanded = false
+                        },
+                        modifier = Modifier.testTag("saved-activity-option-${activity.activityId}"),
+                    )
+                }
+            }
+            if (customTitles.isNotEmpty()) {
+                Text(
+                    "Recent titles",
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    style = MaterialTheme.typography.labelMedium,
+                )
+                customTitles.forEach { title ->
+                    DropdownMenuItem(
+                        text = { Text(title) },
+                        onClick = {
+                            onSelectRecentTitle(title)
+                            expanded = false
+                        },
+                    )
+                }
+            }
+            if (activities.isEmpty() && customTitles.isEmpty()) {
+                DropdownMenuItem(
+                    text = { Text("Sync to load desktop activities") },
+                    onClick = { expanded = false },
+                )
+            }
+        }
+        if (activities.isEmpty()) {
+            Text(
+                "Type a custom title, or sync with desktop to load saved activities.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+    }
+}
+
+@Composable
+private fun CategoryPicker(
+    categories: List<CategorySnapshotEntity>,
+    selectedCategoryId: String?,
+    onSelect: (String?) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val selectedName = categories.firstOrNull { it.categoryId == selectedCategoryId }?.name
+    Box(modifier = Modifier.fillMaxWidth()) {
+        OutlinedButton(
+            onClick = { expanded = true },
+            modifier = Modifier.fillMaxWidth().testTag("category-picker"),
+        ) {
+            Text(selectedName ?: "Choose category")
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            categories.forEach { category ->
+                DropdownMenuItem(
+                    text = { Text(category.name) },
+                    onClick = {
+                        onSelect(category.categoryId)
+                        expanded = false
+                    },
+                    modifier = Modifier.testTag("category-option-${category.categoryId}"),
+                )
+            }
+        }
+    }
+    if (categories.isEmpty()) {
+        Text("Sync with desktop to load available categories.", style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+@Composable
+private fun LocalDateTimePicker(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    dateTag: String,
+    timeTag: String,
+) {
+    val context = LocalContext.current
+    val current = LocalDateTime.parse(value, LOCAL_DATE_TIME_FORMATTER)
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedButton(
+            onClick = {
+                DatePickerDialog(
+                    context,
+                    { _, year, month, dayOfMonth ->
+                        onValueChange(
+                            current.withYear(year)
+                                .withMonth(month + 1)
+                                .withDayOfMonth(dayOfMonth)
+                                .format(LOCAL_DATE_TIME_FORMATTER),
+                        )
+                    },
+                    current.year,
+                    current.monthValue - 1,
+                    current.dayOfMonth,
+                ).show()
+            },
+            modifier = Modifier.weight(1f).testTag(dateTag),
+        ) {
+            Text("$label date · ${current.format(DATE_LABEL_FORMATTER)}")
+        }
+        OutlinedButton(
+            onClick = {
+                TimePickerDialog(
+                    context,
+                    { _, hourOfDay, minute ->
+                        onValueChange(
+                            current.withHour(hourOfDay)
+                                .withMinute(minute)
+                                .format(LOCAL_DATE_TIME_FORMATTER),
+                        )
+                    },
+                    current.hour,
+                    current.minute,
+                    DateFormat.is24HourFormat(context),
+                ).show()
+            },
+            modifier = Modifier.weight(1f).testTag(timeTag),
+        ) {
+            Text("$label time · ${current.format(TIME_LABEL_FORMATTER)}")
+        }
     }
 }
 
@@ -212,6 +462,8 @@ private fun RunningSessionCard(event: TimeIntervalEntity, nowMillis: Long, onSto
 private fun SessionCard(
     event: TimeIntervalEntity,
     nowMillis: Long,
+    isSelected: Boolean,
+    onToggleSelection: () -> Unit,
     onStartAgain: () -> Unit,
     onRemove: () -> Unit,
 ) {
@@ -220,12 +472,24 @@ private fun SessionCard(
             modifier = Modifier.padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Text(event.title, style = MaterialTheme.typography.titleMedium)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(
+                    checked = isSelected,
+                    onCheckedChange = { onToggleSelection() },
+                    modifier = Modifier.testTag("session-selection-${event.entryId}"),
+                )
+                Text(event.title, style = MaterialTheme.typography.titleMedium)
+            }
             val end = event.endedAt?.let(::formatEventTime) ?: "Running · ${elapsedText(event.startedAt, nowMillis)}"
             Text("${formatEventTime(event.startedAt)} – $end")
             Text(if (event.syncedAt == null) "Pending upload" else "Synced", style = MaterialTheme.typography.bodySmall)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = onStartAgain) { Text("Start again") }
+                TextButton(
+                    onClick = onStartAgain,
+                    modifier = Modifier.testTag("start-again-${event.entryId}"),
+                ) {
+                    Text("Start again")
+                }
                 TextButton(onClick = onRemove) { Text("Remove") }
             }
         }
@@ -236,6 +500,10 @@ private fun formatEventTime(epochMillis: Long): String =
     Instant.ofEpochMilli(epochMillis)
         .atZone(ZoneId.systemDefault())
         .format(DateTimeFormatter.ofPattern("MMM d, yyyy HH:mm"))
+
+private val LOCAL_DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm")
+private val DATE_LABEL_FORMATTER = DateTimeFormatter.ofPattern("MMM d, yyyy")
+private val TIME_LABEL_FORMATTER = DateTimeFormatter.ofPattern("HH:mm")
 
 private fun elapsedText(startedAt: Long, nowMillis: Long): String {
     val seconds = Duration.ofMillis((nowMillis - startedAt).coerceAtLeast(0)).seconds

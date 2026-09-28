@@ -38,6 +38,24 @@ class SimpleSessionRulesTest {
     }
 
     @Test
+    fun keepsPickerWallClockValuesInTheDeviceZoneAcrossDaylightSavingOverlap() {
+        val saved = SessionRules.completed(
+            title = "Planning",
+            startedAtLocal = "2026-11-01 01:15",
+            endedAtLocal = "2026-11-01 01:45",
+            zoneId = "America/Los_Angeles",
+        )
+
+        assertEquals(Instant.parse("2026-11-01T08:15:00Z"), saved.startedAt)
+        assertEquals(Instant.parse("2026-11-01T08:45:00Z"), saved.endedAt)
+        assertEquals(-420, saved.timeZoneOffsetMinutes)
+        assertEquals(
+            "2026-11-01 01:15",
+            SessionRules.formatLocalDateTime(saved.startedAt, java.time.ZoneId.of(saved.timeZoneId)),
+        )
+    }
+
+    @Test
     fun rejectsFutureRunningStartsButAcceptsPastOrCurrentStarts() {
         val past = SessionRules.running("Focus", "2026-09-27 15:59", zoneId, now)
         assertEquals(Instant.parse("2026-09-27T11:59:00Z"), past.startedAt)

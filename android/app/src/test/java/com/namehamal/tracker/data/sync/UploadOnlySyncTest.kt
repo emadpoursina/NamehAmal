@@ -1,6 +1,8 @@
 package com.namehamal.tracker.data.sync
 
 import com.namehamal.tracker.data.local.ActivitySnapshotEntity
+import com.namehamal.tracker.data.local.CategoryDao
+import com.namehamal.tracker.data.local.CategorySnapshotEntity
 import com.namehamal.tracker.data.local.ConflictDao
 import com.namehamal.tracker.data.local.ConflictResolutionEntity
 import com.namehamal.tracker.data.local.EntryRevisionEntity
@@ -111,6 +113,7 @@ class UploadOnlySyncTest {
 
     private fun repository(timeline: FakeTimelineDao, sync: FakeSyncDao, api: FakeApi) = SyncRepository(
         timelineDao = timeline,
+        categoryDao = FakeCategoryDao(),
         syncDao = sync,
         conflictDao = FakeConflictDao(),
         api = api,
@@ -124,14 +127,21 @@ class UploadOnlySyncTest {
     ).map { SyncJson.asString(SyncJson.asObject(it)["revisionId"]) ?: error("revisionId missing") }
 
     private class FakeApi(
-        private val capabilities: List<String> = listOf("entry-title", "upload-only"),
+        private val capabilities: List<String> = listOf("entry-title", "upload-only", "category-metadata", "activity-metadata"),
         private val acceptedRevisionCount: Int = Int.MAX_VALUE,
         private val failFirstExchange: Boolean = false,
         private val returnHostRevision: Boolean = false,
     ) : AndroidSyncApi {
         val exchangeBodies = mutableListOf<String>()
         override suspend fun getStatus(endpoint: DesktopEndpoint): SyncCallResult<Map<String, Any?>> =
-            SyncCallResult.Ok(mapOf("protocolVersion" to 1, "capabilities" to capabilities))
+            SyncCallResult.Ok(
+                mapOf(
+                    "protocolVersion" to 1,
+                    "capabilities" to capabilities,
+                    "categories" to emptyList<Any>(),
+                    "activities" to emptyList<Any>(),
+                ),
+            )
 
         override suspend fun postExchange(
             endpoint: DesktopEndpoint,
@@ -163,6 +173,7 @@ class UploadOnlySyncTest {
     }
 
     private class FakeTimelineDao(val intervals: MutableList<TimeIntervalEntity>) : TimelineDao {
+        private val activityRows = mutableListOf<ActivitySnapshotEntity>()
         override suspend fun getActiveWorkday(): WorkdayEntity? = null
         override suspend fun getWorkday(workdayId: String): WorkdayEntity? = null
         override fun observeActiveWorkday(): Flow<WorkdayEntity?> = MutableStateFlow(null)
@@ -175,11 +186,17 @@ class UploadOnlySyncTest {
         override suspend fun getOpenInterval(workdayId: String): TimeIntervalEntity? = null
         override suspend fun getInterval(entryId: String): TimeIntervalEntity? = intervals.firstOrNull { it.entryId == entryId }
         override suspend fun getAllIntervals(): List<TimeIntervalEntity> = intervals.toList()
+        override suspend fun getAllStoredIntervalIds(): List<String> = intervals.map { it.entryId }
         override suspend fun getSyncedEntryIds(): List<String> = intervals.filter { it.syncedAt != null }.map { it.entryId }
         override suspend fun markSynced(entryId: String, revisionId: String, syncedAt: Long) {
             intervals.replaceAll { if (it.entryId == entryId) it.copy(currentRevisionId = revisionId, syncedAt = syncedAt) else it }
         }
         override suspend fun deleteInterval(entryId: String) { intervals.removeAll { it.entryId == entryId } }
+        override suspend fun deleteIntervals(entryIds: List<String>): Int {
+            val before = intervals.size
+            intervals.removeAll { it.entryId in entryIds }
+            return before - intervals.size
+        }
         override suspend fun deleteSyncedIntervals() { intervals.removeAll { it.syncedAt != null } }
         override suspend fun getOpenIntervalForWorkday(workdayId: String): TimeIntervalEntity? = null
         override suspend fun insertWorkday(workday: WorkdayEntity) = Unit
@@ -187,9 +204,14 @@ class UploadOnlySyncTest {
         override suspend fun putInterval(interval: TimeIntervalEntity) { intervals.replaceAll { if (it.entryId == interval.entryId) interval else it } }
         override suspend fun putWorkday(workday: WorkdayEntity) = Unit
         override suspend fun updateWorkday(workday: WorkdayEntity) = Unit
-        override suspend fun putActivity(activity: ActivitySnapshotEntity) = Unit
-        override fun observeActivities(): Flow<List<ActivitySnapshotEntity>> = MutableStateFlow(emptyList())
-        override suspend fun getActivity(activityId: String): ActivitySnapshotEntity? = null
+        override suspend fun putActivity(activity: ActivitySnapshotEntity) {
+            activityRows.removeAll { it.activityId == activity.activityId }
+            activityRows.add(activity)
+        }
+        override suspend fun clearActivities() { activityRows.clear() }
+        override fun observeActivities(): Flow<List<ActivitySnapshotEntity>> = MutableStateFlow(activityRows.filterNot { it.isArchived })
+        override suspend fun getActivity(activityId: String): ActivitySnapshotEntity? =
+            activityRows.firstOrNull { it.activityId == activityId }
     }
 
     private class FakeSyncDao : SyncDao {
@@ -225,6 +247,24 @@ class UploadOnlySyncTest {
         override suspend fun getResolutions(conflictId: String): List<ConflictResolutionEntity> = emptyList()
         override suspend fun getPendingResolutions(): List<ConflictResolutionEntity> = emptyList()
         override suspend fun markResolutionsAcknowledged(resolutionIds: List<String>) = Unit
+    }
+
+    private class FakeCategoryDao : CategoryDao {
+        private val rows = mutableListOf<CategorySnapshotEntity>()
+        override fun observeActiveCategories(): Flow<List<CategorySnapshotEntity>> =
+            MutableStateFlow(rows.filterNot { it.isArchived })
+        override suspend fun getActiveCategory(categoryId: String): CategorySnapshotEntity? =
+            rows.firstOrNull { it.categoryId == categoryId && !it.isArchived }
+        override suspend fun getAllCategories(): List<CategorySnapshotEntity> = rows.toList()
+        override suspend fun upsert(category: CategorySnapshotEntity) {
+            rows.removeAll { it.categoryId == category.categoryId }
+            rows.add(category)
+        }
+        override suspend fun upsert(categories: List<CategorySnapshotEntity>) {
+            rows.removeAll { old -> categories.any { it.categoryId == old.categoryId } }
+            rows.addAll(categories)
+        }
+        override suspend fun clearAll() { rows.clear() }
     }
 
     companion object {

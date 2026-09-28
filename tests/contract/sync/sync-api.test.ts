@@ -75,9 +75,15 @@ describe("sync status contract", () => {
       expect(json.protocolVersion).toBe(1);
       expect(typeof json.desktopDeviceId).toBe("string");
       expect(json.syncEnabled).toBe(true);
-      expect(json.capabilities).toEqual(["entry-title", "upload-only"]);
+      expect(json.capabilities).toEqual([
+        "entry-title",
+        "upload-only",
+        "category-metadata",
+        "activity-metadata",
+      ]);
+      expect(json.categories).toEqual([]);
+      expect(json.activities).toEqual([]);
       expect(json).not.toHaveProperty("sessions");
-      expect(json).not.toHaveProperty("activities");
       // Stable desktop identity across calls.
       const again = (await (await handleStatus(host.client)).json()) as Record<string, unknown>;
       expect(again.desktopDeviceId).toBe(json.desktopDeviceId);

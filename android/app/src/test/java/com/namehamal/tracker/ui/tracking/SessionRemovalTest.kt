@@ -1,6 +1,8 @@
 package com.namehamal.tracker.ui.tracking
 
 import com.namehamal.tracker.data.local.SessionRepository
+import com.namehamal.tracker.data.local.ActivitySnapshotEntity
+import com.namehamal.tracker.data.local.CategorySnapshotEntity
 import com.namehamal.tracker.data.local.TimeIntervalEntity
 import java.time.Instant
 import kotlinx.coroutines.CoroutineScope
@@ -78,7 +80,9 @@ class SessionRemovalTest {
         var removeCalls = 0
         var clearCalls = 0
 
+        override fun observeActivities(): Flow<List<ActivitySnapshotEntity>> = MutableStateFlow(emptyList())
         override fun observeEvents(): Flow<List<TimeIntervalEntity>> = events
+        override fun observeCategories(): Flow<List<CategorySnapshotEntity>> = MutableStateFlow(emptyList())
         override fun observeTitleSuggestions(): Flow<List<String>> =
             MutableStateFlow(SessionFeedRules.previousTitles(events.value))
 
@@ -86,15 +90,19 @@ class SessionRemovalTest {
             title: String,
             startedAtLocal: String,
             endedAtLocal: String,
+            categoryId: String,
             zoneId: String,
             now: Instant,
+            activityId: String?,
         ): TimeIntervalEntity = error("not used")
 
         override suspend fun startSession(
             title: String,
             startedAtLocal: String,
+            categoryId: String,
             zoneId: String,
             now: Instant,
+            activityId: String?,
         ): TimeIntervalEntity = error("not used")
 
         override suspend fun stopSession(entryId: String, at: Instant): TimeIntervalEntity = error("not used")
@@ -104,6 +112,10 @@ class SessionRemovalTest {
             events.value = events.value.filterNot { it.entryId == entryId }
             return true
         }
+
+        override suspend fun removeSessions(entryIds: Set<String>): Int = error("not used")
+
+        override suspend fun clearAllSessions(): Int = error("not used")
 
         override suspend fun clearSyncedSessions(): Int {
             clearCalls += 1

@@ -39,6 +39,7 @@ class TrackerApplication : Application() {
         val deviceId = installationId()
         syncRepository = SyncRepository(
             timelineDao = database.workdayDao(),
+            categoryDao = database.categoryDao(),
             syncDao = database.syncDao(),
             conflictDao = database.conflictDao(),
             api = syncApi,

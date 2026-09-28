@@ -6,6 +6,7 @@ export default defineConfig({
     environment: "node",
     exclude: [
       ...configDefaults.exclude,
+      "**/release/**",
       "**/.next/**",
       "**/.desktop-runtime/**",
     ],

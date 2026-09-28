@@ -64,6 +64,7 @@ export interface HostSyncStore {
   getChangesAfter(seq: number, limit: number): Promise<ChangeLogEntry[]>;
   getRevision(revisionId: string): Promise<StoredRevision | null>;
   getResolution(resolutionId: string): Promise<StoredResolution | null>;
+  getCategory(categoryId: string): Promise<{ categoryId: string; isArchived: boolean } | null>;
   listActivities(): Promise<
     {
       activityId: string;
@@ -139,6 +140,22 @@ async function applyUploadOnlyExchange(
       if (await tx.hasRevision(revision.revisionId)) {
         acceptedRevisionIds.push(revision.revisionId);
         continue;
+      }
+      const categoryId = revision.entry.categoryId;
+      if (categoryId !== null) {
+        if (!categoryId.trim() || categoryId !== categoryId.trim()) {
+          throw {
+            status: 400,
+            message: "entryRevisions: categoryId must identify an active desktop category; no data was changed.",
+          };
+        }
+        const category = await tx.getCategory(categoryId);
+        if (!category || category.isArchived) {
+          throw {
+            status: 400,
+            message: `entryRevisions: category ${categoryId} is unknown or archived; no data was changed.`,
+          };
+        }
       }
       await tx.saveRevision(revision, nextSeq);
       await tx.appendChange(nextSeq, "REVISION", revision.revisionId);
@@ -467,6 +484,11 @@ export class InMemoryHostStore implements HostSyncStore {
 
   async getResolution(resolutionId: string): Promise<StoredResolution | null> {
     return this.resolutions.get(resolutionId) ?? null;
+  }
+
+  async getCategory(categoryId: string): Promise<{ categoryId: string; isArchived: boolean } | null> {
+    const activity = this.activities.find((item) => item.categoryId === categoryId);
+    return activity ? { categoryId, isArchived: false } : null;
   }
 
   async listActivities() {

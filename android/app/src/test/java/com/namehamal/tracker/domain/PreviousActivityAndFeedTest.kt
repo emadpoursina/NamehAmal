@@ -1,6 +1,8 @@
 package com.namehamal.tracker.domain
 
 import com.namehamal.tracker.data.local.SessionRepository
+import com.namehamal.tracker.data.local.ActivitySnapshotEntity
+import com.namehamal.tracker.data.local.CategorySnapshotEntity
 import com.namehamal.tracker.data.local.TimeIntervalEntity
 import com.namehamal.tracker.ui.tracking.SessionFeedRules
 import com.namehamal.tracker.ui.tracking.TrackingViewModel
@@ -44,7 +46,9 @@ class PreviousActivityAndFeedTest {
         )
         runCurrent()
 
-        viewModel.startAgain("Planning")
+        viewModel.prepareRestart(original)
+        assertEquals("planning", viewModel.state.value.selectedCategoryId)
+        viewModel.start()
         runCurrent()
 
         assertEquals(2, repository.events.value.size)
@@ -57,31 +61,49 @@ class PreviousActivityAndFeedTest {
 
     private class FakeSessionRepository(initial: List<TimeIntervalEntity>) : SessionRepository {
         val events = MutableStateFlow(initial)
+        private val categories = MutableStateFlow(
+            listOf(CategorySnapshotEntity("planning", "Planning", 0, false, 1L)),
+        )
+        private val activities = MutableStateFlow(emptyList<ActivitySnapshotEntity>())
+        override fun observeActivities(): Flow<List<ActivitySnapshotEntity>> = activities
         override fun observeEvents(): Flow<List<TimeIntervalEntity>> = events
+        override fun observeCategories(): Flow<List<CategorySnapshotEntity>> = categories
         override fun observeTitleSuggestions(): Flow<List<String>> = events.map(SessionFeedRules::previousTitles)
 
         override suspend fun createCompletedSession(
             title: String,
             startedAtLocal: String,
             endedAtLocal: String,
+            categoryId: String,
             zoneId: String,
             now: Instant,
+            activityId: String?,
         ): TimeIntervalEntity = error("not used")
 
         override suspend fun startSession(
             title: String,
             startedAtLocal: String,
+            categoryId: String,
             zoneId: String,
             now: Instant,
+            activityId: String?,
         ): TimeIntervalEntity {
             val start = Instant.parse("${startedAtLocal.replace(' ', 'T')}:00Z")
-            val next = event("new-${events.value.size}", title, start.toEpochMilli())
+            val next = event(
+                "new-${events.value.size}",
+                title,
+                start.toEpochMilli(),
+                categoryId = categoryId,
+                activityId = activityId,
+            )
             events.value = events.value + next
             return next
         }
 
         override suspend fun stopSession(entryId: String, at: Instant): TimeIntervalEntity = error("not used")
         override suspend fun removeSession(entryId: String): Boolean = error("not used")
+        override suspend fun removeSessions(entryIds: Set<String>): Int = error("not used")
+        override suspend fun clearAllSessions(): Int = error("not used")
         override suspend fun clearSyncedSessions(): Int = error("not used")
     }
 
@@ -91,11 +113,14 @@ class PreviousActivityAndFeedTest {
             title: String,
             startedAt: Long,
             endedAt: Long? = null,
+            categoryId: String? = "planning",
+            activityId: String? = null,
         ) = TimeIntervalEntity(
             entryId = id,
             workdayId = null,
             entryType = "WORK",
-            activityId = null,
+            activityId = activityId,
+            categoryId = categoryId,
             startedAt = startedAt,
             endedAt = endedAt,
             timeZoneId = "UTC",

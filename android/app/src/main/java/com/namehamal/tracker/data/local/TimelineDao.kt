@@ -45,6 +45,9 @@ interface TimelineDao {
     @Query("SELECT * FROM time_intervals WHERE deletedAt IS NULL ORDER BY startedAt ASC")
     suspend fun getAllIntervals(): List<TimeIntervalEntity>
 
+    @Query("SELECT entryId FROM time_intervals")
+    suspend fun getAllStoredIntervalIds(): List<String>
+
     @Query("SELECT entryId FROM time_intervals WHERE syncedAt IS NOT NULL AND deletedAt IS NULL")
     suspend fun getSyncedEntryIds(): List<String>
 
@@ -53,6 +56,9 @@ interface TimelineDao {
 
     @Query("DELETE FROM time_intervals WHERE entryId = :entryId")
     suspend fun deleteInterval(entryId: String)
+
+    @Query("DELETE FROM time_intervals WHERE entryId IN (:entryIds)")
+    suspend fun deleteIntervals(entryIds: List<String>): Int
 
     @Query("DELETE FROM time_intervals WHERE syncedAt IS NOT NULL AND deletedAt IS NULL")
     suspend fun deleteSyncedIntervals()
@@ -77,6 +83,9 @@ interface TimelineDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun putActivity(activity: ActivitySnapshotEntity)
+
+    @Query("DELETE FROM activity_snapshots")
+    suspend fun clearActivities()
 
     @Query("SELECT * FROM activity_snapshots WHERE isArchived = 0 ORDER BY sortOrder, title")
     fun observeActivities(): Flow<List<ActivitySnapshotEntity>>

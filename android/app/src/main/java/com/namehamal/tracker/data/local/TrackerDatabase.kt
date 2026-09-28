@@ -9,6 +9,7 @@ import androidx.room.RoomDatabase
     entities = [
         WorkdayEntity::class,
         TimeIntervalEntity::class,
+        CategorySnapshotEntity::class,
         ActivitySnapshotEntity::class,
         CheckInMarkerEntity::class,
         SyncDeviceEntity::class,
@@ -17,11 +18,12 @@ import androidx.room.RoomDatabase
         SyncConflictEntity::class,
         ConflictResolutionEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 abstract class TrackerDatabase : RoomDatabase() {
     abstract fun workdayDao(): TimelineDao
+    abstract fun categoryDao(): CategoryDao
     abstract fun checkInDao(): CheckInDao
     abstract fun syncDao(): SyncDao
     abstract fun conflictDao(): ConflictDao

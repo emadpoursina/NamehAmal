@@ -334,6 +334,26 @@ export class PrismaHostStore implements HostSyncStore {
     }));
   }
 
+  async listCategories() {
+    const rows = await this.db().category.findMany({
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }, { id: "asc" }],
+    });
+    return rows.map((category) => ({
+      categoryId: category.id,
+      name: category.name,
+      sortOrder: category.sortOrder,
+      isArchived: category.isArchived,
+    }));
+  }
+
+  async getCategory(categoryId: string): Promise<{ categoryId: string; isArchived: boolean } | null> {
+    const category = await this.db().category.findUnique({
+      where: { id: categoryId },
+      select: { id: true, isArchived: true },
+    });
+    return category ? { categoryId: category.id, isArchived: category.isArchived } : null;
+  }
+
   async touchDevice(deviceId: string, deviceType: string): Promise<void> {
     await this.db().syncDevice.upsert({
       where: { deviceId },

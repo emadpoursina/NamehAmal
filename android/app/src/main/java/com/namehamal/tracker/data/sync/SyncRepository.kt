@@ -1,6 +1,8 @@
 package com.namehamal.tracker.data.sync
 
 import com.namehamal.tracker.data.local.ActivitySnapshotEntity
+import com.namehamal.tracker.data.local.CategoryDao
+import com.namehamal.tracker.data.local.CategorySnapshotEntity
 import com.namehamal.tracker.data.local.ConflictDao
 import com.namehamal.tracker.data.local.ConflictResolutionEntity
 import com.namehamal.tracker.data.local.EntryRevisionEntity
@@ -29,6 +31,7 @@ sealed interface SyncOutcome {
  */
 class SyncRepository(
     private val timelineDao: TimelineDao,
+    private val categoryDao: CategoryDao,
     private val syncDao: SyncDao,
     private val conflictDao: ConflictDao,
     private val api: AndroidSyncApi,
@@ -126,10 +129,40 @@ class SyncRepository(
             )
         }
         val capabilities = (status["capabilities"] as? List<*>)?.filterIsInstance<String>().orEmpty()
-        if (!capabilities.containsAll(listOf(ENTRY_TITLE_CAPABILITY, UPLOAD_ONLY_CAPABILITY))) {
+        if (!capabilities.containsAll(
+                listOf(
+                    ENTRY_TITLE_CAPABILITY,
+                    UPLOAD_ONLY_CAPABILITY,
+                    CATEGORY_METADATA_CAPABILITY,
+                    ACTIVITY_METADATA_CAPABILITY,
+                ),
+            )
+        ) {
             return SyncOutcome.Failed(
                 SyncFailureKind.VERSION,
-                "Update the desktop app to support titled upload-only sync. No event data was sent.",
+                "Update the desktop app to support category- and activity-aware sync. No event data was sent.",
+            )
+        }
+
+        val metadata = try {
+            parseCategoryMetadata(status) to parseActivityMetadata(status)
+        } catch (_: IllegalArgumentException) {
+            return SyncOutcome.Failed(
+                SyncFailureKind.PROTOCOL,
+                "The desktop returned invalid category or activity metadata. Existing metadata and sessions are unchanged.",
+            )
+        }
+        try {
+            transaction {
+                categoryDao.clearAll()
+                if (metadata.first.isNotEmpty()) categoryDao.upsert(metadata.first)
+                timelineDao.clearActivities()
+                for (activity in metadata.second) timelineDao.putActivity(activity)
+            }
+        } catch (_: Exception) {
+            return SyncOutcome.Failed(
+                SyncFailureKind.HOST,
+                "Could not refresh categories and activities on the phone. Existing metadata and sessions are unchanged; retry.",
             )
         }
 
@@ -195,6 +228,7 @@ class SyncRepository(
                     latest.activityId == interval.activityId &&
                     latest.timeZoneId == interval.timeZoneId &&
                     latest.timeZoneOffsetMinutes == interval.timeZoneOffsetMinutes &&
+                    latest.categoryId == interval.categoryId &&
                     latest.confirmationState == interval.confirmationState &&
                     latest.deletedAt == null &&
                     latest.title.trim() == title
@@ -214,7 +248,7 @@ class SyncRepository(
                         updatedAt = interval.updatedAt,
                         entryType = interval.entryType,
                         activityId = interval.activityId,
-                        categoryId = null,
+                        categoryId = interval.categoryId,
                         startedAt = interval.startedAt,
                         endedAt = endedAt,
                         timeZoneId = interval.timeZoneId,
@@ -289,6 +323,79 @@ class SyncRepository(
         return accepted.map { it as? String ?: throw IllegalArgumentException("Invalid accepted revision id") }
     }
 
+    private fun parseCategoryMetadata(status: Map<String, Any?>): List<CategorySnapshotEntity> {
+        val values = status["categories"] as? List<*>
+            ?: throw IllegalArgumentException("Missing categories.")
+        val receivedAt = now()
+        val categories = values.map { value ->
+            val category = value as? Map<*, *> ?: throw IllegalArgumentException("Invalid category.")
+            val categoryId = category["categoryId"] as? String
+                ?: throw IllegalArgumentException("Missing categoryId.")
+            val name = category["name"] as? String
+                ?: throw IllegalArgumentException("Missing category name.")
+            val sortOrderValue = category["sortOrder"] as? Number
+                ?: throw IllegalArgumentException("Missing category sortOrder.")
+            val sortOrderNumber = sortOrderValue.toDouble()
+            require(sortOrderNumber.isFinite() && sortOrderNumber % 1.0 == 0.0)
+            require(sortOrderNumber >= Int.MIN_VALUE && sortOrderNumber <= Int.MAX_VALUE)
+            val isArchived = category["isArchived"] as? Boolean
+                ?: throw IllegalArgumentException("Missing category archive state.")
+            require(categoryId.isNotBlank() && categoryId == categoryId.trim())
+            require(name.isNotBlank())
+            CategorySnapshotEntity(
+                categoryId = categoryId,
+                name = name,
+                sortOrder = sortOrderNumber.toInt(),
+                isArchived = isArchived,
+                receivedAt = receivedAt,
+            )
+        }
+        require(categories.map { it.categoryId }.distinct().size == categories.size)
+        return categories
+    }
+
+    private fun parseActivityMetadata(status: Map<String, Any?>): List<ActivitySnapshotEntity> {
+        val values = status["activities"] as? List<*>
+            ?: throw IllegalArgumentException("Missing activities.")
+        val receivedAt = now()
+        val activities = values.map { value ->
+            val activity = value as? Map<*, *> ?: throw IllegalArgumentException("Invalid activity.")
+            val activityId = activity["activityId"] as? String
+                ?: throw IllegalArgumentException("Missing activityId.")
+            val title = activity["title"] as? String
+                ?: throw IllegalArgumentException("Missing activity title.")
+            val categoryId = activity["categoryId"] as? String
+                ?: throw IllegalArgumentException("Missing activity categoryId.")
+            val sortOrderValue = activity["sortOrder"] as? Number
+                ?: throw IllegalArgumentException("Missing activity sortOrder.")
+            val sortOrderNumber = sortOrderValue.toDouble()
+            require(sortOrderNumber.isFinite() && sortOrderNumber % 1.0 == 0.0)
+            require(sortOrderNumber >= Int.MIN_VALUE && sortOrderNumber <= Int.MAX_VALUE)
+            val isArchived = activity["isArchived"] as? Boolean
+                ?: throw IllegalArgumentException("Missing activity archive state.")
+            val color = when (val rawColor = activity["color"]) {
+                null -> null
+                is String -> rawColor
+                else -> throw IllegalArgumentException("Invalid activity color.")
+            }
+            require(activityId.isNotBlank() && activityId == activityId.trim())
+            require(title.isNotBlank())
+            require(categoryId.isNotBlank() && categoryId == categoryId.trim())
+            ActivitySnapshotEntity(
+                activityId = activityId,
+                title = title,
+                categoryId = categoryId,
+                color = color,
+                sortOrder = sortOrderNumber.toInt(),
+                isArchived = isArchived,
+                snapshotVersion = activityId,
+                receivedAt = receivedAt,
+            )
+        }
+        require(activities.map { it.activityId }.distinct().size == activities.size)
+        return activities
+    }
+
     /**
      * Reconcile local intervals into pending revisions. Open intervals
      * (endedAt null) are still being tracked and are exported once closed.
@@ -302,6 +409,7 @@ class SyncRepository(
                 latest.startedAt == interval.startedAt &&
                 latest.endedAt == endedAt &&
                 latest.activityId == interval.activityId &&
+                latest.categoryId == interval.categoryId &&
                 latest.title == interval.title &&
                 latest.entryType == interval.entryType &&
                 latest.confirmationState == interval.confirmationState &&
@@ -320,7 +428,7 @@ class SyncRepository(
                     entryType = interval.entryType,
                     title = interval.title,
                     activityId = interval.activityId,
-                    categoryId = null,
+                    categoryId = interval.categoryId,
                     startedAt = interval.startedAt,
                     endedAt = endedAt,
                     timeZoneId = interval.timeZoneId,
@@ -533,6 +641,7 @@ class SyncRepository(
                 entryType = revision.entryType,
                 title = revision.title?.takeIf { it.isNotBlank() } ?: local?.title ?: "Unassigned",
                 activityId = if (revision.entryType == "BREAK") null else revision.activityId,
+                categoryId = revision.categoryId,
                 startedAt = revision.startedAt,
                 endedAt = revision.endedAt,
                 timeZoneId = revision.timeZoneId,
@@ -625,5 +734,7 @@ class SyncRepository(
         const val UPLOAD_ONLY_MODE = "UPLOAD_ONLY"
         const val ENTRY_TITLE_CAPABILITY = "entry-title"
         const val UPLOAD_ONLY_CAPABILITY = "upload-only"
+        const val CATEGORY_METADATA_CAPABILITY = "category-metadata"
+        const val ACTIVITY_METADATA_CAPABILITY = "activity-metadata"
     }
 }

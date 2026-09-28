@@ -25,6 +25,9 @@ class SessionRemovalPersistenceTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         context.deleteDatabase(databaseName)
         database = openDatabase(context)
+        runBlocking {
+            database.categoryDao().upsert(CategorySnapshotEntity("test-category", "Test", 0, false, 1L))
+        }
     }
 
     @After fun closeDatabase() {
@@ -37,16 +40,16 @@ class SessionRemovalPersistenceTest {
         val repository = TimelineRepository(database, "test-device")
         val now = Instant.parse("2026-09-27T12:00:00Z")
         val removed = repository.createCompletedSession(
-            "Remove me", "2026-09-27 08:00", "2026-09-27 09:00", "UTC", now,
+            "Remove me", "2026-09-27 08:00", "2026-09-27 09:00", "test-category", "UTC", now,
         )
         val synced = repository.createCompletedSession(
-            "Synced", "2026-09-27 09:00", "2026-09-27 10:00", "UTC", now,
+            "Synced", "2026-09-27 09:00", "2026-09-27 10:00", "test-category", "UTC", now,
         )
         val pending = repository.createCompletedSession(
-            "Pending", "2026-09-27 10:00", "2026-09-27 11:00", "UTC", now,
+            "Pending", "2026-09-27 10:00", "2026-09-27 11:00", "test-category", "UTC", now,
         )
         val running = repository.startSession(
-            "Running", "2026-09-27 11:30", "UTC", now,
+            "Running", "2026-09-27 11:30", "test-category", "UTC", now,
         )
         val syncDao = database.syncDao()
         syncDao.insertRevision(revision("rev-remove", removed, acknowledged = true))

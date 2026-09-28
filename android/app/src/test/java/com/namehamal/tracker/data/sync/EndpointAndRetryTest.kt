@@ -2,6 +2,8 @@ package com.namehamal.tracker.data.sync
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import com.namehamal.tracker.data.local.ActivitySnapshotEntity
+import com.namehamal.tracker.data.local.CategoryDao
+import com.namehamal.tracker.data.local.CategorySnapshotEntity
 import com.namehamal.tracker.data.local.ConflictDao
 import com.namehamal.tracker.data.local.ConflictResolutionEntity
 import com.namehamal.tracker.data.local.EntryRevisionEntity
@@ -77,6 +79,35 @@ class EndpointAndRetryTest {
         assertFalse(SavedDesktopEndpoint.isPrivateDestination(addresses))
     }
 
+    @Test
+    fun acceptsTailscaleSharedAddressSpaceButNotAdjacentRanges() {
+        assertTrue(
+            SavedDesktopEndpoint.isPrivateDestination(
+                listOf(java.net.InetAddress.getByName("100.110.180.85")),
+            ),
+        )
+        assertTrue(
+            SavedDesktopEndpoint.isPrivateDestination(
+                listOf(java.net.InetAddress.getByName("100.64.0.0")),
+            ),
+        )
+        assertTrue(
+            SavedDesktopEndpoint.isPrivateDestination(
+                listOf(java.net.InetAddress.getByName("100.127.255.255")),
+            ),
+        )
+        assertFalse(
+            SavedDesktopEndpoint.isPrivateDestination(
+                listOf(java.net.InetAddress.getByName("100.63.255.255")),
+            ),
+        )
+        assertFalse(
+            SavedDesktopEndpoint.isPrivateDestination(
+                listOf(java.net.InetAddress.getByName("100.128.0.0")),
+            ),
+        )
+    }
+
     // endregion
 
     // region saved endpoint reuse / forgetting
@@ -128,6 +159,7 @@ class EndpointAndRetryTest {
         override suspend fun getOpenIntervalForWorkday(workdayId: String): TimeIntervalEntity? =
             getOpenInterval(workdayId)
         override suspend fun getAllIntervals(): List<TimeIntervalEntity> = intervals.toList()
+        override suspend fun getAllStoredIntervalIds(): List<String> = intervals.map { it.entryId }
         override suspend fun getSyncedEntryIds(): List<String> =
             intervals.filter { it.syncedAt != null && it.deletedAt == null }.map { it.entryId }
         override suspend fun markSynced(entryId: String, revisionId: String, syncedAt: Long) {
@@ -137,6 +169,11 @@ class EndpointAndRetryTest {
         }
         override suspend fun deleteInterval(entryId: String) {
             intervals.removeAll { it.entryId == entryId }
+        }
+        override suspend fun deleteIntervals(entryIds: List<String>): Int {
+            val before = intervals.size
+            intervals.removeAll { it.entryId in entryIds }
+            return before - intervals.size
         }
         override suspend fun deleteSyncedIntervals() {
             intervals.removeAll { it.syncedAt != null }
@@ -155,6 +192,7 @@ class EndpointAndRetryTest {
             activities.removeAll { it.activityId == activity.activityId }
             activities.add(activity)
         }
+        override suspend fun clearActivities() { activities.clear() }
         override fun observeActivities(): Flow<List<ActivitySnapshotEntity>> = MutableStateFlow(activities)
         override suspend fun getActivity(activityId: String): ActivitySnapshotEntity? =
             activities.firstOrNull { it.activityId == activityId }
@@ -226,6 +264,24 @@ class EndpointAndRetryTest {
         }
     }
 
+    private class FakeCategoryDao : CategoryDao {
+        private val rows = mutableListOf<CategorySnapshotEntity>()
+        override fun observeActiveCategories(): Flow<List<CategorySnapshotEntity>> =
+            MutableStateFlow(rows.filterNot { it.isArchived })
+        override suspend fun getActiveCategory(categoryId: String): CategorySnapshotEntity? =
+            rows.firstOrNull { it.categoryId == categoryId && !it.isArchived }
+        override suspend fun getAllCategories(): List<CategorySnapshotEntity> = rows.toList()
+        override suspend fun upsert(category: CategorySnapshotEntity) {
+            rows.removeAll { it.categoryId == category.categoryId }
+            rows.add(category)
+        }
+        override suspend fun upsert(categories: List<CategorySnapshotEntity>) {
+            rows.removeAll { old -> categories.any { it.categoryId == old.categoryId } }
+            rows.addAll(categories)
+        }
+        override suspend fun clearAll() { rows.clear() }
+    }
+
     private class FakeApi(
         var status: SyncCallResult<Map<String, Any?>> =
             SyncCallResult.Ok(mapOf("protocolVersion" to 1, "desktopDeviceId" to "desktop", "syncEnabled" to true)),
@@ -283,6 +339,7 @@ class EndpointAndRetryTest {
         api: FakeApi = FakeApi(),
     ) = SyncRepository(
         timelineDao = timeline,
+        categoryDao = FakeCategoryDao(),
         syncDao = sync,
         conflictDao = conflicts,
         api = api,

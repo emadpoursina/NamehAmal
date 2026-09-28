@@ -14,12 +14,14 @@ class TimelineRepository(
     private val sourceDeviceId: String,
 ) : SessionRepository {
     private val dao get() = database.workdayDao()
+    private val categoryDao get() = database.categoryDao()
     private val checkIns get() = database.checkInDao()
 
     fun observeActiveWorkday(): Flow<WorkdayEntity?> = dao.observeActiveWorkday()
     fun observeTimeline(): Flow<List<TimeIntervalEntity>> = dao.observeTimeline()
-    fun observeActivities(): Flow<List<ActivitySnapshotEntity>> = dao.observeActivities()
+    override fun observeActivities(): Flow<List<ActivitySnapshotEntity>> = dao.observeActivities()
 
+    override fun observeCategories(): Flow<List<CategorySnapshotEntity>> = categoryDao.observeActiveCategories()
     override fun observeEvents(): Flow<List<TimeIntervalEntity>> = dao.observeEvents()
     override fun observeTitleSuggestions(): Flow<List<String>> = dao.observeTitleSuggestions()
 
@@ -27,24 +29,32 @@ class TimelineRepository(
         title: String,
         startedAtLocal: String,
         endedAtLocal: String,
+        categoryId: String,
         zoneId: String,
         now: Instant,
+        activityId: String?,
     ): TimeIntervalEntity = database.withTransaction {
+        requireAvailableCategory(categoryId)
+        requireAvailableActivity(activityId, categoryId)
         val session = SessionRules.completed(title, startedAtLocal, endedAtLocal, zoneId)
-        newSession(session, now.toEpochMilli()).also { dao.insertInterval(it) }
+        newSession(session, categoryId, activityId, now.toEpochMilli()).also { dao.insertInterval(it) }
     }
 
     override suspend fun startSession(
         title: String,
         startedAtLocal: String,
+        categoryId: String,
         zoneId: String,
         now: Instant,
+        activityId: String?,
     ): TimeIntervalEntity = database.withTransaction {
         require(dao.getRunningInterval() == null) {
             "A session is already running. Stop it before starting another."
         }
+        requireAvailableCategory(categoryId)
+        requireAvailableActivity(activityId, categoryId)
         val session = SessionRules.running(title, startedAtLocal, zoneId, now)
-        newSession(session, now.toEpochMilli()).also { dao.insertInterval(it) }
+        newSession(session, categoryId, activityId, now.toEpochMilli()).also { dao.insertInterval(it) }
     }
 
     override suspend fun stopSession(entryId: String, at: Instant): TimeIntervalEntity = database.withTransaction {
@@ -61,6 +71,15 @@ class TimelineRepository(
         database.syncDao().deleteRevisionsForEntry(entryId)
         dao.deleteInterval(entryId)
         true
+    }
+
+    override suspend fun removeSessions(entryIds: Set<String>): Int = database.withTransaction {
+        val visibleIds = dao.getAllIntervals().mapTo(mutableSetOf()) { it.entryId }
+        deleteSessionIdsInTransaction(entryIds.intersect(visibleIds))
+    }
+
+    override suspend fun clearAllSessions(): Int = database.withTransaction {
+        deleteSessionIdsInTransaction(dao.getAllStoredIntervalIds().toSet())
     }
 
     override suspend fun clearSyncedSessions(): Int = database.withTransaction {
@@ -230,11 +249,38 @@ class TimelineRepository(
         }
     }
 
-    private fun newSession(session: SessionRules.SessionTimes, updatedAt: Long) = TimeIntervalEntity(
+    private suspend fun requireAvailableCategory(categoryId: String) {
+        require(categoryId.isNotBlank() && categoryDao.getActiveCategory(categoryId) != null) {
+            "Choose an available category before saving or starting a session."
+        }
+    }
+
+    private suspend fun requireAvailableActivity(activityId: String?, categoryId: String) {
+        if (activityId == null) return
+        val activity = dao.getActivity(activityId)
+        require(activity != null && !activity.isArchived && activity.categoryId == categoryId) {
+            "That saved activity is no longer available. Sync with desktop and select it again."
+        }
+    }
+
+    private suspend fun deleteSessionIdsInTransaction(entryIds: Set<String>): Int {
+        if (entryIds.isEmpty()) return 0
+        val targetIds = entryIds.toList()
+        database.syncDao().deleteRevisionsForEntries(targetIds)
+        return dao.deleteIntervals(targetIds)
+    }
+
+    private fun newSession(
+        session: SessionRules.SessionTimes,
+        categoryId: String,
+        activityId: String?,
+        updatedAt: Long,
+    ) = TimeIntervalEntity(
         entryId = UUID.randomUUID().toString(),
         workdayId = null,
         entryType = IntervalRules.WORK,
-        activityId = null,
+        activityId = activityId,
+        categoryId = categoryId,
         startedAt = session.startedAt.toEpochMilli(),
         endedAt = session.endedAt?.toEpochMilli(),
         timeZoneId = session.timeZoneId,

@@ -113,7 +113,7 @@ class SavedDesktopEndpoint(
             return labels.isNotEmpty() && labels.all { it.length <= 63 && HOST_LABEL.matches(it) }
         }
 
-        /** Every DNS result must be a private, loopback, or link-local destination. */
+        /** Every DNS result must be private, loopback, link-local, or Tailscale CGNAT space. */
         fun isPrivateDestination(addresses: List<InetAddress>): Boolean =
             addresses.isNotEmpty() && addresses.all(::isPrivateOrLoopback)
 
@@ -121,7 +121,7 @@ class SavedDesktopEndpoint(
             if (address.isLoopbackAddress || address.isLinkLocalAddress) return true
             val bytes = address.address.map { it.toInt() and 0xff }
             if (address is Inet4Address) {
-                return address.isSiteLocalAddress || isPrivateIpv4(bytes)
+                return address.isSiteLocalAddress || isPrivateIpv4(bytes) || isTailscaleIpv4(bytes)
             }
             if (address is Inet6Address) {
                 if ((bytes[0] and 0xfe) == 0xfc ||
@@ -146,5 +146,9 @@ class SavedDesktopEndpoint(
                 else -> false
             }
         }
+
+        /** Tailscale IPv4 addresses come from RFC 6598's 100.64.0.0/10 shared space. */
+        private fun isTailscaleIpv4(bytes: List<Int>): Boolean =
+            bytes.size == 4 && bytes[0] == 100 && bytes[1] in 64..127
     }
 }

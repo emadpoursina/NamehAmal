@@ -132,5 +132,20 @@ object DatabaseMigrations {
         }
     }
 
-    val ALL: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+    val MIGRATION_4_5 = object : Migration(4, 5) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE time_intervals ADD COLUMN categoryId TEXT")
+            db.execSQL(
+                """CREATE TABLE IF NOT EXISTS category_snapshots (
+                    categoryId TEXT NOT NULL PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    sortOrder INTEGER NOT NULL,
+                    isArchived INTEGER NOT NULL,
+                    receivedAt INTEGER NOT NULL
+                )""".trimIndent(),
+            )
+        }
+    }
+
+    val ALL: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
 }

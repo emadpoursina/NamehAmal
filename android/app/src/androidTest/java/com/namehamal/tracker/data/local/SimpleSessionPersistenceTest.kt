@@ -25,6 +25,9 @@ class SimpleSessionPersistenceTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         context.deleteDatabase(databaseName)
         database = openDatabase(context)
+        runBlocking {
+            database.categoryDao().upsert(CategorySnapshotEntity("test-category", "Test", 0, false, 1L))
+        }
     }
 
     @After fun closeDatabase() {
@@ -39,11 +42,13 @@ class SimpleSessionPersistenceTest {
             title = "Planning",
             startedAtLocal = "2026-04-10 08:15",
             endedAtLocal = "2026-04-10 09:15",
+            categoryId = "test-category",
             zoneId = "Asia/Yerevan",
             now = Instant.parse("2026-09-27T12:00:00Z"),
         )
         assertNull(completed.workdayId)
         assertEquals("Planning", completed.title)
+        assertEquals("test-category", completed.categoryId)
         assertEquals("Asia/Yerevan", completed.timeZoneId)
         assertEquals(240, completed.timeZoneOffsetMinutes)
         assertEquals(Instant.parse("2026-04-10T04:15:00Z").toEpochMilli(), completed.startedAt)
@@ -63,6 +68,7 @@ class SimpleSessionPersistenceTest {
         val running = repository.startSession(
             title = "Focus",
             startedAtLocal = "2026-09-27 15:00",
+            categoryId = "test-category",
             zoneId = "Asia/Yerevan",
             now = Instant.parse("2026-09-27T12:00:00Z"),
         )
@@ -75,7 +81,7 @@ class SimpleSessionPersistenceTest {
         assertEquals(running, database.workdayDao().getRunningInterval())
         val rejected = runCatching {
             reopenedRepository.startSession(
-                "Another", "2026-09-27 15:30", "Asia/Yerevan", Instant.parse("2026-09-27T12:00:00Z"),
+                "Another", "2026-09-27 15:30", "test-category", "Asia/Yerevan", Instant.parse("2026-09-27T12:00:00Z"),
             )
         }
         assertNotNull(rejected.exceptionOrNull())
@@ -91,11 +97,11 @@ class SimpleSessionPersistenceTest {
     @Test fun allDatesFeedHasStableNewestFirstOrderAndRecentDistinctTitleSuggestions() = runBlocking {
         val repository = TimelineRepository(database, "test-device")
         val now = Instant.parse("2026-09-27T12:00:00Z")
-        repository.createCompletedSession("Planning", "2026-04-10 08:00", "2026-04-10 08:30", "UTC", now)
-        repository.createCompletedSession("Writing", "2026-04-10 09:00", "2026-04-10 09:30", "UTC", now)
-        repository.createCompletedSession("Planning", "2026-04-10 10:00", "2026-04-10 10:30", "UTC", now)
-        repository.createCompletedSession("Same time A", "2026-04-11 10:00", "2026-04-11 10:30", "UTC", now)
-        repository.createCompletedSession("Same time B", "2026-04-11 10:00", "2026-04-11 10:30", "UTC", now)
+        repository.createCompletedSession("Planning", "2026-04-10 08:00", "2026-04-10 08:30", "test-category", "UTC", now)
+        repository.createCompletedSession("Writing", "2026-04-10 09:00", "2026-04-10 09:30", "test-category", "UTC", now)
+        repository.createCompletedSession("Planning", "2026-04-10 10:00", "2026-04-10 10:30", "test-category", "UTC", now)
+        repository.createCompletedSession("Same time A", "2026-04-11 10:00", "2026-04-11 10:30", "test-category", "UTC", now)
+        repository.createCompletedSession("Same time B", "2026-04-11 10:00", "2026-04-11 10:30", "test-category", "UTC", now)
 
         val feed = repository.observeEvents().first()
         val tied = feed.filter { it.startedAt == feed.first().startedAt }

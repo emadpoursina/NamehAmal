@@ -1,7 +1,7 @@
 /** On-demand sync readiness check. Returns no time data. (T026) */
 
 import type { PrismaClient } from "@/app/generated/prisma/client";
-import { SYNC_PROTOCOL_VERSION } from "@/app/server/sync/validation";
+import { SYNC_PROTOCOL_VERSION, type ActivitySnapshotDto } from "@/app/server/sync/validation";
 import { PrismaHostStore } from "@/app/server/sync/prisma-store";
 
 export const runtime = "nodejs";
@@ -14,7 +14,19 @@ export interface StatusResponse {
   protocolVersion: number;
   desktopDeviceId: string;
   syncEnabled: boolean;
-  capabilities: readonly ["entry-title", "upload-only"];
+  capabilities: readonly [
+    "entry-title",
+    "upload-only",
+    "category-metadata",
+    "activity-metadata",
+  ];
+  categories: {
+    categoryId: string;
+    name: string;
+    sortOrder: number;
+    isArchived: boolean;
+  }[];
+  activities: ActivitySnapshotDto[];
 }
 
 /** Testable status handler; the exported GET uses the production database. */
@@ -23,12 +35,23 @@ export async function handleStatus(
 ): Promise<Response> {
   try {
     const store = new PrismaHostStore(client);
-    const desktopDeviceId = await store.getDesktopDeviceId();
+    const [desktopDeviceId, categories, activities] = await Promise.all([
+      store.getDesktopDeviceId(),
+      store.listCategories(),
+      store.listActivities(),
+    ]);
     const body: StatusResponse = {
       protocolVersion: SYNC_PROTOCOL_VERSION,
       desktopDeviceId,
       syncEnabled: true,
-      capabilities: ["entry-title", "upload-only"] as const,
+      capabilities: [
+        "entry-title",
+        "upload-only",
+        "category-metadata",
+        "activity-metadata",
+      ] as const,
+      categories,
+      activities,
     };
     return Response.json(body, { headers: noStoreHeaders() });
   } catch {
