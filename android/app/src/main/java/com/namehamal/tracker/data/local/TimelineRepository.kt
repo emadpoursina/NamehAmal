@@ -204,6 +204,39 @@ class TimelineRepository(
     suspend fun markCheckInDelivered(checkInId: String, deliveredAt: Instant) =
         checkIns.markDelivered(checkInId, deliveredAt.toEpochMilli())
 
+    suspend fun runningSessionId(): String? = dao.getRunningInterval()?.entryId
+
+    /**
+     * Records an hourly check-in for a manually started running session and returns the
+     * new marker plus the session title so a reminder can name what is being tracked.
+     * Returns null when no matching session is running, so a stale reminder cannot fire.
+     */
+    suspend fun recordSessionCheckIn(entryId: String, dueAt: Instant): SessionCheckIn? = database.withTransaction {
+        val running = dao.getRunningInterval() ?: return@withTransaction null
+        if (running.entryId != entryId) return@withTransaction null
+        val hadPending = checkIns.pendingEntryIdsForEntry(entryId).isNotEmpty()
+        checkIns.markEntryPendingMissed(entryId)
+        if (hadPending) checkIns.markIntervalsUnconfirmed(listOf(entryId))
+        val id = UUID.randomUUID().toString()
+        checkIns.insert(CheckInMarkerEntity(
+            checkInId = id,
+            workdayId = "",
+            entryId = entryId,
+            dueAt = dueAt.toEpochMilli(),
+            deliveredAt = null,
+            state = PENDING,
+        ))
+        SessionCheckIn(id, running.title)
+    }
+
+    suspend fun confirmSessionCheckIn(checkInId: String): Boolean = database.withTransaction {
+        val marker = checkIns.get(checkInId) ?: return@withTransaction false
+        if (dao.getRunningInterval()?.entryId != marker.entryId) return@withTransaction false
+        checkIns.markConfirmed(checkInId)
+        checkIns.markIntervalConfirmed(marker.entryId)
+        true
+    }
+
     private suspend fun transition(entryType: String, activityId: String?, at: Instant, zoneId: ZoneId) {
         database.withTransaction {
             val workday = requireNotNull(dao.getActiveWorkday()) { "No workday is active." }
@@ -313,3 +346,6 @@ class TimelineRepository(
         const val MISSED = "MISSED"
     }
 }
+
+/** A recorded reminder for a running session plus the title to show with it. */
+data class SessionCheckIn(val checkInId: String, val title: String)

@@ -22,6 +22,15 @@ interface CheckInDao {
     @Query("UPDATE check_in_markers SET state = 'MISSED' WHERE workdayId = :workdayId AND state = 'PENDING'")
     suspend fun markPendingMissed(workdayId: String)
 
+    @Query("SELECT * FROM check_in_markers WHERE entryId = :entryId ORDER BY dueAt")
+    suspend fun getForEntry(entryId: String): List<CheckInMarkerEntity>
+
+    @Query("SELECT entryId FROM check_in_markers WHERE entryId = :entryId AND state = 'PENDING'")
+    suspend fun pendingEntryIdsForEntry(entryId: String): List<String>
+
+    @Query("UPDATE check_in_markers SET state = 'MISSED' WHERE entryId = :entryId AND state = 'PENDING'")
+    suspend fun markEntryPendingMissed(entryId: String)
+
     @Query("UPDATE check_in_markers SET state = 'MISSED' WHERE checkInId = :checkInId AND state = 'PENDING'")
     suspend fun markMissed(checkInId: String)
 

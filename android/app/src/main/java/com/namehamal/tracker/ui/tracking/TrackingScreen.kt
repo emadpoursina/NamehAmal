@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import com.namehamal.tracker.data.local.TimeIntervalEntity
 import com.namehamal.tracker.data.local.ActivitySnapshotEntity
 import com.namehamal.tracker.data.local.CategorySnapshotEntity
+import com.namehamal.tracker.ui.checkin.NotificationPermissionCard
 import com.namehamal.tracker.ui.sync.SyncSettingsViewModel
 import com.namehamal.tracker.ui.sync.SyncUiState
 import java.time.Duration
@@ -96,6 +97,8 @@ fun TrackingScreen(
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
+
+            NotificationPermissionCard()
 
             state.runningSession?.let { event ->
                 RunningSessionCard(

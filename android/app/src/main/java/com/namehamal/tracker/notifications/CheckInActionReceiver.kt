@@ -19,7 +19,11 @@ class CheckInActionReceiver : BroadcastReceiver() {
                 val pending = goAsync()
                 CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
                     try {
-                        app.timelineRepository.confirmCheckIn(checkInId)
+                        val repository = app.timelineRepository
+                        // Session reminders confirm by running session; workday markers fall back.
+                        if (!repository.confirmSessionCheckIn(checkInId)) {
+                            repository.confirmCheckIn(checkInId)
+                        }
                     } finally {
                         pending.finish()
                     }

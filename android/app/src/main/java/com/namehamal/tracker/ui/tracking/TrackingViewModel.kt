@@ -51,6 +51,8 @@ class TrackingViewModel(
     private val repository: SessionRepository,
     private val now: () -> Instant = { Instant.now() },
     private val zoneId: () -> ZoneId = { ZoneId.systemDefault() },
+    private val onSessionStarted: (String) -> Unit = {},
+    private val onSessionStopped: () -> Unit = {},
     coroutineScope: CoroutineScope? = null,
 ) : ViewModel() {
     private val scope = coroutineScope ?: viewModelScope
@@ -188,7 +190,7 @@ class TrackingViewModel(
         val current = mutable.value
         val categoryId = requireSelectedCategory(current) ?: return
         launchAction {
-            repository.startSession(
+            val session = repository.startSession(
                 current.title,
                 current.startedAtLocal,
                 categoryId,
@@ -196,6 +198,7 @@ class TrackingViewModel(
                 now(),
                 current.selectedActivityId,
             )
+            onSessionStarted(session.entryId)
             mutable.value = mutable.value.copy(message = "Session started.", isError = false)
         }
     }
@@ -226,6 +229,7 @@ class TrackingViewModel(
     fun stop(entryId: String) {
         launchAction {
             repository.stopSession(entryId, now())
+            onSessionStopped()
             mutable.value = mutable.value.copy(message = "Session stopped.", isError = false)
         }
     }
@@ -268,8 +272,10 @@ class TrackingViewModel(
 
     fun confirmRemoveSelected() {
         val ids = mutable.value.pendingBulkRemovalIds ?: return
+        val runningRemoved = mutable.value.events.any { it.entryId in ids && it.endedAt == null }
         launchAction {
             val removed = repository.removeSessions(ids)
+            if (runningRemoved) onSessionStopped()
             mutable.value = mutable.value.copy(
                 pendingBulkRemovalIds = null,
                 selectedEntryIds = mutable.value.selectedEntryIds - ids,
@@ -289,8 +295,10 @@ class TrackingViewModel(
 
     fun confirmClearAll() {
         if (!mutable.value.confirmClearAll) return
+        val runningRemoved = mutable.value.events.any { it.endedAt == null }
         launchAction {
             val removed = repository.clearAllSessions()
+            if (runningRemoved) onSessionStopped()
             mutable.value = mutable.value.copy(
                 confirmClearAll = false,
                 selectedEntryIds = emptySet(),
@@ -302,8 +310,10 @@ class TrackingViewModel(
 
     fun confirmRemove() {
         val event = mutable.value.pendingRemoval ?: return
+        val runningRemoved = event.endedAt == null
         launchAction {
             repository.removeSession(event.entryId)
+            if (runningRemoved) onSessionStopped()
             mutable.value = mutable.value.copy(
                 pendingRemoval = null,
                 message = "Session removed from this device.",

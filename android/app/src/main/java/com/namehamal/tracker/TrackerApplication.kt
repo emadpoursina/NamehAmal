@@ -10,9 +10,14 @@ import com.namehamal.tracker.data.sync.HttpAndroidSyncApi
 import com.namehamal.tracker.data.sync.SavedDesktopEndpoint
 import com.namehamal.tracker.data.sync.SyncRepository
 import com.namehamal.tracker.notifications.CheckInScheduler
+import com.namehamal.tracker.notifications.SessionCheckInScheduler
 import com.namehamal.tracker.ui.sync.SyncSettingsViewModel
 import com.namehamal.tracker.ui.tracking.TrackingViewModel
 import java.util.UUID
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 class TrackerApplication : Application() {
     lateinit var database: TrackerDatabase
@@ -27,11 +32,14 @@ class TrackerApplication : Application() {
         private set
     lateinit var syncApi: AndroidSyncApi
         private set
+    lateinit var sessionCheckInScheduler: SessionCheckInScheduler
+        private set
+
+    private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     override fun onCreate() {
         super.onCreate()
-        // Workday/check-in tracking is retired in the simplified app. Cancel work
-        // that may have been scheduled by an earlier installation before showing UI.
+        // Cancel any workday check-ins left by an earlier installation before showing UI.
         CheckInScheduler(this).cancel()
         database = TrackerDatabase.getInstance(this)
         timelineRepository = TimelineRepository(database, installationId())
@@ -54,12 +62,26 @@ class TrackerApplication : Application() {
             transaction = { block -> database.withTransaction(block) },
         )
         savedDesktopEndpoint = SavedDesktopEndpoint(this)
+        sessionCheckInScheduler = SessionCheckInScheduler(this)
+        // Resume reminders for a session that survived an app restart, or clear stale work.
+        applicationScope.launch {
+            val running = timelineRepository.runningSessionId()
+            if (running != null) {
+                sessionCheckInScheduler.schedule(running)
+            } else {
+                sessionCheckInScheduler.cancelAll()
+            }
+        }
     }
 
     fun syncSettingsViewModel(): SyncSettingsViewModel =
         SyncSettingsViewModel(savedDesktopEndpoint, syncRepository)
 
-    fun trackingViewModel(): TrackingViewModel = TrackingViewModel(timelineRepository)
+    fun trackingViewModel(): TrackingViewModel = TrackingViewModel(
+        repository = timelineRepository,
+        onSessionStarted = { entryId -> sessionCheckInScheduler.schedule(entryId) },
+        onSessionStopped = { sessionCheckInScheduler.cancelAll() },
+    )
 
     private fun installationId(): String {
         val preferences = getSharedPreferences("tracker-installation", MODE_PRIVATE)

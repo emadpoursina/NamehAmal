@@ -16,6 +16,10 @@
 - Q: After an event has synced to the desktop, should removing it on Android also remove it from the desktop at the next sync, or only from Android? → A: Android is temporary storage: manual sync sends events to the desktop and marks successful sends as synced; users may then remove synced events locally, and that removal never deletes desktop records.
 - Q: Should manual completed sessions support dates in the past, or be limited to today's date? → A: Allow past dates.
 
+### Session 2026-09-30
+
+- Q: The 2026-09-27 session retired hourly check-in reminders; should reminders return to the simplified app? → A: Re-introduce approximately hourly check-in reminders for a running manual session, without restoring the workday or break flows. A reminder names the running session, offers a one-tap "Still working" confirmation that marks the interval confirmed, and marks the interval Unconfirmed when a reminder is ignored. Reminders are scheduled only while a session is running and stop when it stops or is removed.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Record an Activity Simply (Priority: P1)
@@ -126,7 +130,7 @@ As a person connecting the Android app to my existing server, I want to enter an
 - **FR-015**: Session times MUST be entered and displayed in the user's device-local time zone, consistently with the existing tracker.
 - **FR-016**: During user-initiated sync, the Android app MUST send local events to the configured desktop and mark an event as synced only after it has been successfully sent.
 - **FR-017**: The Android app MUST let the user clear successfully synced events from Android local storage after confirmation. This action MUST NOT remove desktop records or be sent as a deletion; events not successfully synced remain available on Android.
-- **FR-018**: The Android app MUST NOT present workday start/end, break-tracking, or check-in reminder flows; tracking MUST use direct session entry and start/stop actions.
+- **FR-018**: The Android app MUST NOT present workday start/end or break-tracking flows; tracking MUST use direct session entry and start/stop actions. While a session is running, the app MUST schedule approximately hourly check-in reminders for that session only, stop them when the session stops or is removed, confirm the running interval on the reminder's one-tap action, and leave the interval Unconfirmed when a reminder is ignored.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -151,6 +155,6 @@ As a person connecting the Android app to my existing server, I want to enter an
 - Session titles are free text. Previously used titles are available for starting another session.
 - The user's explicit Start action begins recording immediately using the entered start timestamp; a future timestamp does not schedule an automatic start.
 - Only one session can be actively recorded at a time. A running session remains visible after app closure and can be stopped when the user returns.
-- The event list is the main Android screen. It shows all dates together; the user does not need separate Today or Timeline screens, a split workflow, workday flow, break flow, check-in reminders, or day-based navigation to track and review sessions.
+- The event list is the main Android screen. It shows all dates together; the user does not need separate Today or Timeline screens, a split workflow, workday flow, break flow, or day-based navigation to track and review sessions. Reminders are a light nudge on a running session, not a separate tracking workflow.
 - Server settings use an address and port for user-initiated sync. Android sends events to the desktop and marks successfully sent events as synced; users may clear synced events from Android afterward. Clearing events is local and does not delete desktop records. This feature does not add automatic or cloud synchronization.
 - Session times follow the device's local time zone, consistent with the existing tracker.
