@@ -13,17 +13,17 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.namehamal.tracker.MainActivity
 
+/**
+ * Legacy workday check-in notification, retained only so the unscheduled workday path still
+ * compiles and any leftover scheduled work can be cancelled. The live reminder is the neutral,
+ * session-independent [ReminderNotification]; the former session-named copy and "Still working"
+ * action were retired with the session-bound reminder.
+ */
 object CheckInNotification {
     const val CHANNEL_ID = "workday-check-ins"
-    const val SESSION_CHANNEL_ID = "session-check-ins"
     const val BODY = "What have you been working on?"
     const val ACTION_SAME_ACTIVITY = "Same activity"
-    const val ACTION_STILL_WORKING = "Still working"
     const val PERMISSION_EXPLANATION = "Allow notifications for hourly check-ins. Your offline timeline remains available for review if notifications are denied or delayed."
-
-    /** Reminder copy for a running manual session; names the tracked activity when unlocked. */
-    fun sessionBody(title: String): String =
-        "Still working on \"$title\"? Confirm or open to update your tracking."
 
     fun canNotify(context: Context): Boolean =
         (Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(
@@ -38,16 +38,6 @@ object CheckInNotification {
         channelName = "Workday check-ins",
         body = BODY,
         actionLabel = ACTION_SAME_ACTIVITY,
-    )
-
-    /** Hourly reminder for a running manual session. */
-    fun showSession(context: Context, checkInId: String, sessionTitle: String): Boolean = notify(
-        context = context,
-        checkInId = checkInId,
-        channelId = SESSION_CHANNEL_ID,
-        channelName = "Session check-ins",
-        body = sessionBody(sessionTitle),
-        actionLabel = ACTION_STILL_WORKING,
     )
 
     private fun notify(

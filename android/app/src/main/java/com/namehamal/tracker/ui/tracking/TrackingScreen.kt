@@ -40,23 +40,22 @@ import androidx.compose.ui.unit.dp
 import com.namehamal.tracker.data.local.TimeIntervalEntity
 import com.namehamal.tracker.data.local.ActivitySnapshotEntity
 import com.namehamal.tracker.data.local.CategorySnapshotEntity
-import com.namehamal.tracker.ui.checkin.NotificationPermissionCard
-import com.namehamal.tracker.ui.sync.SyncSettingsViewModel
-import com.namehamal.tracker.ui.sync.SyncUiState
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
+/**
+ * Main tracking surface. It keeps only tracking actions plus a single Settings entry: the desktop
+ * connection/sync UI and the reminder configuration live on the Settings screen (FR-002).
+ */
 @Composable
 fun TrackingScreen(
     viewModel: TrackingViewModel,
-    syncViewModel: SyncSettingsViewModel,
     onOpenSettings: () -> Unit,
 ) {
     val state by viewModel.state.collectAsState()
-    val syncState by syncViewModel.state.collectAsState(initial = SyncUiState())
 
     Scaffold { padding ->
         Column(
@@ -67,38 +66,20 @@ fun TrackingScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text("NamehAmal tracking", style = MaterialTheme.typography.headlineMedium)
-            Text("Track directly. Times use your device's local timezone.", style = MaterialTheme.typography.bodyMedium)
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    onClick = {
-                        if (syncState.savedEndpoint == null) onOpenSettings() else syncViewModel.syncNow()
-                    },
-                    enabled = !syncState.isSyncing,
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("NamehAmal tracking", style = MaterialTheme.typography.headlineMedium)
+                OutlinedButton(
+                    onClick = onOpenSettings,
+                    modifier = Modifier.testTag("settings-entry"),
                 ) {
-                    Text(
-                        when {
-                            syncState.isSyncing -> "Syncing…"
-                            syncState.savedEndpoint == null -> "Set up sync"
-                            else -> "Sync"
-                        },
-                    )
+                    Text("Settings")
                 }
-                OutlinedButton(onClick = onOpenSettings) { Text("Connection settings") }
             }
-            syncState.savedEndpoint?.let {
-                Text("Desktop: ${it.host}:${it.port}", style = MaterialTheme.typography.bodySmall)
-            }
-            syncState.message?.let {
-                Text(
-                    it,
-                    color = if (syncState.isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-
-            NotificationPermissionCard()
+            Text("Track directly. Times use your device's local timezone.", style = MaterialTheme.typography.bodyMedium)
 
             state.runningSession?.let { event ->
                 RunningSessionCard(

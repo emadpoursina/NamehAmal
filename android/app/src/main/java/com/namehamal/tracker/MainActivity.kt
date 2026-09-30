@@ -11,7 +11,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import com.namehamal.tracker.ui.sync.SyncSettingsScreen
+import com.namehamal.tracker.ui.settings.ReminderSettingsViewModel
+import com.namehamal.tracker.ui.settings.SettingsScreen
 import com.namehamal.tracker.ui.sync.SyncSettingsViewModel
 import com.namehamal.tracker.ui.tracking.TrackingScreen
 import com.namehamal.tracker.ui.tracking.TrackingViewModel
@@ -23,16 +24,21 @@ class MainActivity : ComponentActivity() {
         val factory = TrackerViewModelFactory(tracker)
         val trackingViewModel = ViewModelProvider(this, factory)[TrackingViewModel::class.java]
         val syncSettingsViewModel = ViewModelProvider(this, factory)[SyncSettingsViewModel::class.java]
+        val reminderSettingsViewModel =
+            ViewModelProvider(this, factory)[ReminderSettingsViewModel::class.java]
         setContent {
             var showingSettings by rememberSaveable { mutableStateOf(false) }
             MaterialTheme {
                 Surface {
                     if (showingSettings) {
-                        SyncSettingsScreen(syncSettingsViewModel, onBack = { showingSettings = false })
+                        SettingsScreen(
+                            reminderViewModel = reminderSettingsViewModel,
+                            syncViewModel = syncSettingsViewModel,
+                            onBack = { showingSettings = false },
+                        )
                     } else {
                         TrackingScreen(
                             viewModel = trackingViewModel,
-                            syncViewModel = syncSettingsViewModel,
                             onOpenSettings = { showingSettings = true },
                         )
                     }
@@ -49,6 +55,7 @@ private class TrackerViewModelFactory(
         val created: ViewModel = when {
             modelClass.isAssignableFrom(TrackingViewModel::class.java) -> tracker.trackingViewModel()
             modelClass.isAssignableFrom(SyncSettingsViewModel::class.java) -> tracker.syncSettingsViewModel()
+            modelClass.isAssignableFrom(ReminderSettingsViewModel::class.java) -> tracker.reminderSettingsViewModel()
             else -> throw IllegalArgumentException("Unknown tracker ViewModel: ${modelClass.name}")
         }
         @Suppress("UNCHECKED_CAST")

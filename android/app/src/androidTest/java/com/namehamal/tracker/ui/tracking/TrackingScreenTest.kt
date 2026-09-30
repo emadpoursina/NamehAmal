@@ -16,7 +16,6 @@ import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.activity.ComponentActivity
-import com.namehamal.tracker.TrackerApplication
 import com.namehamal.tracker.data.local.ActivitySnapshotEntity
 import com.namehamal.tracker.data.local.CategorySnapshotEntity
 import com.namehamal.tracker.data.local.TimeIntervalEntity
@@ -74,10 +73,9 @@ class TrackingScreenTest {
 
     @Test
     fun dateAndTimePickersOpenConfirmAndCancelWithoutMovingTrackingContent() {
-        val syncViewModel = (composeRule.activity.application as TrackerApplication).syncSettingsViewModel()
         composeRule.setContent {
             MaterialTheme {
-                TrackingScreen(viewModel, syncViewModel) {}
+                TrackingScreen(viewModel) {}
             }
         }
         composeRule.waitForIdle()
@@ -170,10 +168,9 @@ class TrackingScreenTest {
                 ),
             )
         }
-        val syncViewModel = (composeRule.activity.application as TrackerApplication).syncSettingsViewModel()
         composeRule.setContent {
             MaterialTheme {
-                TrackingScreen(viewModel, syncViewModel) {}
+                TrackingScreen(viewModel) {}
             }
         }
         composeRule.waitForIdle()
@@ -199,6 +196,30 @@ class TrackingScreenTest {
 
         composeRule.onNodeWithTag("start-again-previous").assertExists()
         composeRule.onNodeWithText("Start again: Previous custom session").assertDoesNotExist()
+    }
+
+    @Test
+    fun mainScreenHasNoInlineConfigurationAndOffersSettingsEntry() {
+        var opened = 0
+        composeRule.setContent {
+            MaterialTheme {
+                TrackingScreen(viewModel, onOpenSettings = { opened += 1 })
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("settings-entry").assertExists()
+        composeRule.onNodeWithTag("settings-entry").performClick()
+        composeRule.runOnIdle { assertEquals(1, opened) }
+
+        composeRule.onNodeWithText("Connection settings").assertDoesNotExist()
+        composeRule.onNodeWithText("Set up sync").assertDoesNotExist()
+        composeRule.onNodeWithText("Sync").assertDoesNotExist()
+        composeRule.onNodeWithTag("sync-host").assertDoesNotExist()
+        composeRule.onNodeWithTag("sync-port").assertDoesNotExist()
+        composeRule.onNodeWithTag("sync-now").assertDoesNotExist()
+        composeRule.onNodeWithTag("reminder-permission").assertDoesNotExist()
+        composeRule.onNodeWithText("Hourly check-ins").assertDoesNotExist()
     }
 
     private fun textFor(tag: String): String = composeRule.onNodeWithTag(tag)

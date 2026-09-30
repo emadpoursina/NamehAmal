@@ -4,19 +4,24 @@ import android.app.Application
 import androidx.room.withTransaction
 import com.namehamal.tracker.data.local.TimelineRepository
 import com.namehamal.tracker.data.local.TrackerDatabase
+import com.namehamal.tracker.data.settings.ReminderSettingsStore
 import com.namehamal.tracker.data.sync.AndroidSyncApi
 import com.namehamal.tracker.data.sync.ConflictResolutionRepository
 import com.namehamal.tracker.data.sync.HttpAndroidSyncApi
 import com.namehamal.tracker.data.sync.SavedDesktopEndpoint
 import com.namehamal.tracker.data.sync.SyncRepository
 import com.namehamal.tracker.notifications.CheckInScheduler
-import com.namehamal.tracker.notifications.SessionCheckInScheduler
+import com.namehamal.tracker.notifications.ReminderNotification
+import com.namehamal.tracker.notifications.ReminderPermission
+import com.namehamal.tracker.notifications.ReminderScheduler
+import com.namehamal.tracker.ui.settings.ReminderSettingsViewModel
 import com.namehamal.tracker.ui.sync.SyncSettingsViewModel
 import com.namehamal.tracker.ui.tracking.TrackingViewModel
 import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class TrackerApplication : Application() {
@@ -32,7 +37,9 @@ class TrackerApplication : Application() {
         private set
     lateinit var syncApi: AndroidSyncApi
         private set
-    lateinit var sessionCheckInScheduler: SessionCheckInScheduler
+    lateinit var reminderSettingsStore: ReminderSettingsStore
+        private set
+    lateinit var reminderScheduler: ReminderScheduler
         private set
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -62,14 +69,16 @@ class TrackerApplication : Application() {
             transaction = { block -> database.withTransaction(block) },
         )
         savedDesktopEndpoint = SavedDesktopEndpoint(this)
-        sessionCheckInScheduler = SessionCheckInScheduler(this)
-        // Resume reminders for a session that survived an app restart, or clear stale work.
+        reminderSettingsStore = ReminderSettingsStore(this)
+        reminderScheduler = ReminderScheduler(this)
+        // Resume the always-on reminder from persisted settings after process death or reboot, or
+        // clear stale work when reminders are disabled.
         applicationScope.launch {
-            val running = timelineRepository.runningSessionId()
-            if (running != null) {
-                sessionCheckInScheduler.schedule(running)
+            val settings = reminderSettingsStore.settings.first()
+            if (settings.enabled) {
+                reminderScheduler.scheduleNext(settings)
             } else {
-                sessionCheckInScheduler.cancelAll()
+                reminderScheduler.cancelAll()
             }
         }
     }
@@ -77,10 +86,15 @@ class TrackerApplication : Application() {
     fun syncSettingsViewModel(): SyncSettingsViewModel =
         SyncSettingsViewModel(savedDesktopEndpoint, syncRepository)
 
+    fun reminderSettingsViewModel(): ReminderSettingsViewModel = ReminderSettingsViewModel(
+        store = reminderSettingsStore,
+        scheduler = reminderScheduler,
+        permissionStateProvider = { ReminderPermission.state(this) },
+        postTestNotification = { ReminderNotification.post(this) },
+    )
+
     fun trackingViewModel(): TrackingViewModel = TrackingViewModel(
         repository = timelineRepository,
-        onSessionStarted = { entryId -> sessionCheckInScheduler.schedule(entryId) },
-        onSessionStopped = { sessionCheckInScheduler.cancelAll() },
     )
 
     private fun installationId(): String {
