@@ -1,0 +1,56 @@
+{
+  "name": "get_time_entries",
+  "description": "Read finalized time entries actually tracked in the NamehAmal Mac app for the half-open range [start, end). Use this to compare actual tracked time against planned time (e.g. Google Calendar). Read-only: it never starts, stops, edits, or deletes entries. In-progress timers and deleted entries are excluded.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "start": {
+        "type": "string",
+        "format": "date-time",
+        "description": "Inclusive range start as an ISO-8601 datetime, e.g. 2026-09-29T00:00:00+04:00."
+      },
+      "end": {
+        "type": "string",
+        "format": "date-time",
+        "description": "Exclusive range end as an ISO-8601 datetime. Must be after start."
+      },
+      "limit": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 500,
+        "default": 500,
+        "description": "Maximum entries to return (chronological). When truncated is true, narrow the range and call again."
+      }
+    },
+    "required": ["start", "end"],
+    "additionalProperties": false
+  },
+  "returns": {
+    "type": "object",
+    "properties": {
+      "start": { "type": "string" },
+      "end": { "type": "string" },
+      "count": { "type": "integer" },
+      "totalDurationSeconds": { "type": "integer" },
+      "truncated": { "type": "boolean" },
+      "entries": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "string" },
+            "title": { "type": ["string", "null"] },
+            "categoryId": { "type": "string" },
+            "categoryName": { "type": "string" },
+            "kind": { "type": "string", "enum": ["MANUAL", "TIMER"] },
+            "occurredAt": { "type": "string" },
+            "startedAt": { "type": ["string", "null"] },
+            "endedAt": { "type": ["string", "null"] },
+            "durationSeconds": { "type": "integer" },
+            "timeZone": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}
