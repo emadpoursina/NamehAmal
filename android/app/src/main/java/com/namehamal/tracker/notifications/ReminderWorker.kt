@@ -52,8 +52,15 @@ class ReminderWorker(context: Context, params: WorkerParameters) : CoroutineWork
                 windowStartMinutes = settings.windowStartMinutes,
                 windowEndMinutes = settings.windowEndMinutes,
             )
-            val posted = withinWindow && permitted && post()
-            scheduleNext()
+            // Always schedule the next trigger, even when this run is skipped (outside the window
+            // or not permitted) and even when post() throws (e.g. a revoked permission between
+            // the check and notify): otherwise one skipped/failed run kills the hourly chain.
+            var posted = false
+            try {
+                posted = withinWindow && permitted && post()
+            } finally {
+                scheduleNext()
+            }
             return posted
         }
     }

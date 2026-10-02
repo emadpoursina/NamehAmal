@@ -14,11 +14,15 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.namehamal.tracker.ui.sync.SyncSettingsSection
 import com.namehamal.tracker.ui.sync.SyncSettingsViewModel
 
@@ -34,6 +38,17 @@ fun SettingsScreen(
     onBack: () -> Unit,
 ) {
     val reminderState by reminderViewModel.state.collectAsState()
+    // Returning from the system notification settings does not trigger the in-app permission
+    // launcher, so refresh on every resume; otherwise the test button keeps reporting "permission
+    // required" after the user just granted it.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) reminderViewModel.refreshPermissionState()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     Scaffold { contentPadding ->
         Column(

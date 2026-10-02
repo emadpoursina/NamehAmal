@@ -1,10 +1,12 @@
 package com.namehamal.tracker.notifications
 
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.media.RingtoneManager
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -61,6 +63,11 @@ object ReminderNotification {
             .setSmallIcon(android.R.drawable.ic_popup_reminder)
             .setContentTitle(TITLE)
             .setContentText(BODY)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
+            .setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
+            .setVibrate(longArrayOf(0, 250, 250, 250))
             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
             .setContentIntent(openApp)
             .setAutoCancel(true)
@@ -81,8 +88,20 @@ object ReminderNotification {
     private fun createChannel(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        manager.createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, CHANNEL_NAME, NotificationManager.IMPORTANCE_DEFAULT),
-        )
+        // Sound lives on the channel (API 26+): importance LOW/DEFAULT may stay silent, and
+        // createNotificationChannel() never upgrades an existing channel, so a channel created by
+        // an older install would stay silent forever. Delete and recreate when it is too quiet.
+        val existing = manager.getNotificationChannel(CHANNEL_ID)
+        if (existing != null && existing.importance >= NotificationManager.IMPORTANCE_HIGH) return
+        if (existing != null) manager.deleteNotificationChannel(CHANNEL_ID)
+        val channel =
+            NotificationChannel(CHANNEL_ID, CHANNEL_NAME, NotificationManager.IMPORTANCE_HIGH).apply {
+                description = "Hourly reminders to check in on your tracking."
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 250, 250, 250)
+                setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION), null)
+                lockscreenVisibility = Notification.VISIBILITY_PRIVATE
+            }
+        manager.createNotificationChannel(channel)
     }
 }

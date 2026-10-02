@@ -36,14 +36,23 @@ class ReminderScheduler(
     private val workManager = WorkManager.getInstance(context.applicationContext)
 
     override fun scheduleNext(settings: ReminderSettings) {
-        workManager.cancelUniqueWork(UNIQUE_WORK_NAME)
-        if (!settings.enabled) return
+        // Do NOT call cancelUniqueWork() before enqueue: enqueueUniqueWork(REPLACE) already
+        // replaces atomically, while a separate async cancel can race the enqueue on real devices
+        // and wipe the just-scheduled work, silently killing the hourly chain. (The test work
+        // manager runs synchronously, so the race only shows in production.)
+        if (!settings.enabled) {
+            workManager.cancelUniqueWork(UNIQUE_WORK_NAME)
+            return
+        }
         val next = ReminderSchedule.nextTrigger(
             now = now(),
             windowStartMinutes = settings.windowStartMinutes,
             windowEndMinutes = settings.windowEndMinutes,
             intervalMinutes = settings.intervalMinutes,
-        ) ?: return
+        ) ?: run {
+            workManager.cancelUniqueWork(UNIQUE_WORK_NAME)
+            return
+        }
         val delayMillis = Duration.between(Instant.now(), next).toMillis().coerceAtLeast(0L)
         val request = OneTimeWorkRequestBuilder<ReminderWorker>()
             .setInitialDelay(delayMillis, TimeUnit.MILLISECONDS)
@@ -58,7 +67,8 @@ class ReminderScheduler(
     }
 
     override fun reschedule(settings: ReminderSettings) {
-        cancelAll()
+        // scheduleNext() with REPLACE already cancels the pending chain atomically; a separate
+        // async cancelAll() here could run after the enqueue and wipe it.
         scheduleNext(settings)
     }
 
